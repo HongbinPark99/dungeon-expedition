@@ -1026,8 +1026,7 @@ function draw(){
     const r2=ratio*ratio;
     const red = Math.min(255, 60+195*r2|0);
     const grn = Math.min(255, 230-200*r2|0);
-    const fc = `rgb(${red},${grn},20)`;    // 초록→노랑→빨강
-    const fc0 = `rgba(${red},${grn},20,0)`;
+    const fillC = `rgb(${red},${grn},20)`;  // 초록→노랑→빨강 (fc와 다른 이름 — fog ctx 충돌 방지)
     const style = m.attackStyle||'fill_circle';
     const ang = m.aimAngle||0;
     ctx.save();
@@ -1041,11 +1040,11 @@ function draw(){
       // 채워지는 원 (작은→큰)
       const fillR = m.range * ratio;
       ctx.globalAlpha=0.18+ratio*0.22;
-      ctx.fillStyle=fc;
+      ctx.fillStyle=fillC;
       ctx.beginPath(); ctx.arc(sx,sy,fillR,0,Math.PI*2); ctx.fill();
       // 테두리 원
       ctx.globalAlpha=0.5+ratio*0.45;
-      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.strokeStyle=fillC; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(sx,sy,fillR,0,Math.PI*2); ctx.stroke();
     }
 
@@ -1054,7 +1053,7 @@ function draw(){
       const arm = m.range * ratio;
       const thick = 18+ratio*10;
       ctx.globalAlpha=0.12+ratio*0.22;
-      ctx.fillStyle=fc;
+      ctx.fillStyle=fillC;
       // 십자 4방향 막대 (ang 기준 회전)
       ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
       ctx.fillRect(-arm,-thick/2,arm*2,thick);
@@ -1062,7 +1061,7 @@ function draw(){
       ctx.restore();
       // 외곽 십자 테두리 (최대 범위)
       ctx.globalAlpha=0.35+ratio*0.5;
-      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.strokeStyle=fillC; ctx.lineWidth=2;
       ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
       ctx.strokeRect(-m.range,-thick/2*1.2,m.range*2,thick*1.2);
       ctx.strokeRect(-thick/2*1.2,-m.range,thick*1.2,m.range*2);
@@ -1082,13 +1081,13 @@ function draw(){
       // 채워지는 원뿔
       const coneR = m.range * ratio;
       ctx.globalAlpha=0.18+ratio*0.28;
-      ctx.fillStyle=fc;
+      ctx.fillStyle=fillC;
       ctx.beginPath();
       ctx.moveTo(sx,sy);
       ctx.arc(sx,sy,coneR,ang-coneAngle,ang+coneAngle);
       ctx.closePath(); ctx.fill();
       ctx.globalAlpha=0.45+ratio*0.5;
-      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.strokeStyle=fillC; ctx.lineWidth=2;
       ctx.beginPath();
       ctx.moveTo(sx,sy);
       ctx.arc(sx,sy,coneR,ang-coneAngle,ang+coneAngle);
@@ -1108,13 +1107,13 @@ function draw(){
       ctx.restore();
       // 채워지는 막대
       ctx.globalAlpha=0.15+ratio*0.25;
-      ctx.fillStyle=fc;
+      ctx.fillStyle=fillC;
       ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
       ctx.fillRect(0,-thick/2,lineLen,thick);
       ctx.restore();
       // 테두리 막대
       ctx.globalAlpha=0.5+ratio*0.45;
-      ctx.strokeStyle=fc; ctx.lineWidth=2.5;
+      ctx.strokeStyle=fillC; ctx.lineWidth=2.5;
       ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
       ctx.strokeRect(0,-thick/2,lineLen,thick);
       ctx.restore();
@@ -1130,13 +1129,13 @@ function draw(){
       ctx.beginPath(); ctx.arc(sx,sy,outerR,0,Math.PI*2); ctx.stroke();
       // 수축하는 링 도넛
       ctx.globalAlpha=0.15+ratio*0.28;
-      ctx.fillStyle=fc;
+      ctx.fillStyle=fillC;
       ctx.beginPath();
       ctx.arc(sx,sy,outerR,0,Math.PI*2,false);
       ctx.arc(sx,sy,innerR,0,Math.PI*2,true);
       ctx.fill();
       ctx.globalAlpha=0.5+ratio*0.45;
-      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.strokeStyle=fillC; ctx.lineWidth=2;
       ctx.beginPath(); ctx.arc(sx,sy,innerR,0,Math.PI*2); ctx.stroke();
     }
 
@@ -1148,7 +1147,7 @@ function draw(){
       ctx.beginPath(); ctx.arc(sx,sy,m.range,0,Math.PI*2); ctx.stroke();
       // 8방향 화살표 선 (ratio만큼 길어짐)
       ctx.globalAlpha=0.55+ratio*0.4;
-      ctx.strokeStyle=fc; ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.strokeStyle=fillC; ctx.lineWidth=2; ctx.lineCap='round';
       for(let i=0;i<8;i++){
         const a = ang + (Math.PI*2/8)*i;
         const alen = m.range*0.85*ratio;
@@ -1303,34 +1302,27 @@ function draw(){
     ctx.restore();
   });
 
-  // ── Fog of War (별도 캔버스 → 합성) ────────────────
-  // fogCv 에 fog를 그린 뒤 main canvas 위에 올림
-  // → destination-out 이 main canvas 픽셀을 건드리지 않음
+  // ── Fog of War — 4개 코너 삼각형으로 시야 원 밖을 가림 ──
+  // clipPath 없이 순수 fillRect + 원형 그라디언트로 처리
+  // 플레이어는 항상 fog 위에 그림
   {
-    if(!window._fogCv || window._fogCv.width!==W || window._fogCv.height!==H){
-      window._fogCv  = document.createElement('canvas');
-      window._fogCtx = window._fogCv.getContext('2d');
-    }
-    window._fogCv.width=W; window._fogCv.height=H;
-    const fc=window._fogCtx;
-    const sx=player.x-camX, sy=player.y-camY;
-
-    // fog 레이어 전체를 어둡게
-    fc.fillStyle='rgba(5,8,16,0.91)';
-    fc.fillRect(0,0,W,H);
-
-    // 시야 원 구멍
-    fc.globalCompositeOperation='destination-out';
-    const grad=fc.createRadialGradient(sx,sy,SIGHT_R*0.45,sx,sy,SIGHT_R);
-    grad.addColorStop(0,  'rgba(0,0,0,1)');
-    grad.addColorStop(0.7,'rgba(0,0,0,0.9)');
-    grad.addColorStop(1,  'rgba(0,0,0,0)');
-    fc.fillStyle=grad;
-    fc.beginPath(); fc.arc(sx,sy,SIGHT_R,0,Math.PI*2); fc.fill();
-    fc.globalCompositeOperation='source-over';
-
-    // fog 레이어를 main canvas 위에 합성
-    ctx.drawImage(window._fogCv,0,0);
+    const psx=player.x-camX, psy=player.y-camY;
+    // 시야 원 바깥을 어둡게: 화면 전체를 어두운 색으로 채우되
+    // 시야 원 부분은 radialGradient로 투명하게 뚫음
+    // → ctx.save/restore로 globalCompositeOperation 격리
+    ctx.save();
+    // 전체 어두운 레이어
+    ctx.fillStyle='rgba(5,8,16,0.92)';
+    ctx.fillRect(-10,-10,W+20,H+20);
+    // 시야 원: destination-out으로 구멍
+    ctx.globalCompositeOperation='destination-out';
+    const fogGrad=ctx.createRadialGradient(psx,psy,SIGHT_R*0.4,psx,psy,SIGHT_R);
+    fogGrad.addColorStop(0,  'rgba(0,0,0,1)');
+    fogGrad.addColorStop(0.65,'rgba(0,0,0,0.95)');
+    fogGrad.addColorStop(1,  'rgba(0,0,0,0)');
+    ctx.fillStyle=fogGrad;
+    ctx.beginPath(); ctx.arc(psx,psy,SIGHT_R,0,Math.PI*2); ctx.fill();
+    ctx.restore(); // ← compositeOperation 원복, 이후 그리기는 정상 source-over
   }
 
   // ── 파티클 (fog 위) ───────────────────────────────
