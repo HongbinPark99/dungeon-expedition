@@ -325,15 +325,15 @@ function buildMap(){
   for(let i=0;i<rooms.length-4;i+=4) if(rooms[i+4]) carveCorridor(rooms[i].cx,rooms[i].cy,rooms[i+4].cx,rooms[i+4].cy);
 
   // ── 보스 방 (오른쪽 하단) ─────────────────────────
-  const bArena = {x: MAP_W-520, y: MAP_H-480, w:460, h:420};
+  const bArena = {x: MAP_W-860, y: MAP_H-780, w:800, h:720};
   const bc = Math.floor(bArena.x/TILE), br = Math.floor(bArena.y/TILE);
   const bw = Math.ceil(bArena.w/TILE), bh = Math.ceil(bArena.h/TILE);
   for(let r=br;r<br+bh;r++)
     for(let c=bc;c<bc+bw;c++) setTile(c,r,0);
   // 보스 방 입구 통로
   const entryR = br + (bh>>1);
-  for(let r=entryR-2;r<=entryR+2;r++)
-    for(let c=bc-5;c<=bc;c++) setTile(c,r,0);
+  for(let r=entryR-4;r<=entryR+4;r++)
+    for(let c=bc-8;c<=bc;c++) setTile(c,r,0);
 
   return { rooms, bArena };
 }
@@ -431,22 +431,30 @@ function initGame(){
 // ═══════════════════════════════════════════════════════
 //  몬스터
 // ═══════════════════════════════════════════════════════
-// pattern: 'circle'=원형, 'line'=일자, 'cross'=십자, 'spread'=방사, 'ring'=링
+// attackStyle: fill_circle / fill_cone / fill_cross / fill_line / fill_ring / fill_scatter
 const MTYPE = {
-  goblin:{ hp:50,  atk:16, spd:1.9, range:55,  warn:90,  cd:110, size:12, score:10, col:'#3d8', pattern:'circle' },
-  orc:   { hp:100, atk:30, spd:1.2, range:70,  warn:105, cd:140, size:17, score:20, col:'#e74', pattern:'cross'  },
-  shade: { hp:42,  atk:20, spd:2.8, range:48,  warn:75,  cd:95,  size:11, score:15, col:'#88f', pattern:'spread' },
-  archer:{ hp:60,  atk:22, spd:1.0, range:160, warn:140, cd:150, size:13, score:18, col:'#4b8', pattern:'line'   },
-  mage:  { hp:70,  atk:28, spd:0.9, range:100, warn:120, cd:160, size:14, score:25, col:'#b6f', pattern:'ring'   },
-  boss:  { hp:900, atk:50, spd:1.3, range:110, warn:150, cd:170, size:30, score:500,col:'#f40', pattern:'cross'  },
+  // 원형: 원이 꽉 차면 전방위 폭발
+  goblin: { hp:55,  atk:18, spd:1.9, range:60,  warn:90,  cd:115, size:12, score:10, col:'#3c9', attackStyle:'fill_circle' },
+  // 십자: 십자 모양이 차면 상하좌우로 레이저 쏨
+  orc:    { hp:105, atk:32, spd:1.2, range:90,  warn:110, cd:145, size:17, score:20, col:'#e63', attackStyle:'fill_cross'  },
+  // 산탄: 원 안에서 8방향 총알이 퍼짐
+  shade:  { hp:45,  atk:22, spd:2.9, range:55,  warn:75,  cd:95,  size:11, score:15, col:'#99f', attackStyle:'fill_scatter'},
+  // 직선 레이저: 바가 꽉 차면 방향 레이저 발사
+  archer: { hp:65,  atk:24, spd:1.0, range:200, warn:145, cd:155, size:13, score:18, col:'#4c8', attackStyle:'fill_line'   },
+  // 링 수축: 링이 안으로 수축하면서 폭발
+  mage:   { hp:75,  atk:30, spd:0.9, range:110, warn:125, cd:165, size:14, score:25, col:'#c7f', attackStyle:'fill_ring'   },
+  // 원뿔: 원뿔 모양이 차면 그 방향으로 쐐기 공격
+  hunter: { hp:80,  atk:26, spd:1.5, range:130, warn:120, cd:140, size:15, score:22, col:'#fa4', attackStyle:'fill_cone'   },
+  // 보스: 페이즈별 복합 패턴
+  boss:   { hp:900, atk:55, spd:1.3, range:120, warn:155, cd:175, size:30, score:500,col:'#f40', attackStyle:'fill_cross'  },
 };
-const MEMOJI={ goblin:'👺',orc:'👹',shade:'👻',archer:'🏹',mage:'🔮',boss:'👑' };
+const MEMOJI={ goblin:'👺',orc:'👹',shade:'👻',archer:'🏹',mage:'🔮',hunter:'🏃',boss:'👑' };
 let nextId=1;
 
 function spawnMonster(type){
   // 랜덤 빈 타일 위치 (보스 방 밖)
   let x,y,tries=0;
-  const types=['goblin','orc','shade','archer','mage'];
+  const types=['goblin','orc','shade','archer','mage','hunter'];
   type = type || types[Math.random()*types.length|0];
   do {
     x = (1+Math.random()*(COLS-2))*TILE;
@@ -466,11 +474,12 @@ function spawnMonster(type){
     range:cfg.range, warn:cfg.warn,
     cd:cfg.cd, size:cfg.size,
     score:cfg.score, col:cfg.col,
-    pattern:cfg.pattern||'circle',
+    attackStyle:cfg.attackStyle||'fill_circle',
     attackCd: (Math.random()*cfg.cd)|0,
     warnPhase:false, alive:true,
     enraged:false, phase:0,
-    lineAngle:0, // line/spread 패턴용 고정 각도
+    aimAngle:0,   // 경고 시작 시 고정된 공격 각도
+    bossPhase:0,  // 보스 페이즈 카운터
   });
 }
 
@@ -645,50 +654,89 @@ function update(){
       addLog('🔥 보스가 격노했습니다!','boss');
     }
 
-    // 경고 단계 시작 시 패턴 각도 고정 (일자/방사용)
+    // 경고 시작 시 각도 고정
     if(m.attackCd===m.warn){
-      m.lineAngle=Math.atan2(dy,dx);
+      m.aimAngle = Math.atan2(dy, dx);
     }
 
-    // 공격
+    // 공격 발동
     if(m.attackCd<=0){
-      m.attackCd = m.enraged?(m.cd*0.68)|0 : m.cd;
+      m.attackCd = m.enraged ? (m.cd*0.65)|0 : m.cd;
       if(!player.alive) return;
-      // 방패 중이면 피해 없음
+      const style = m.attackStyle||'fill_circle';
       const shielded = shieldActive>0 || player.iframes>0;
-      let hit=false;
-      const pat=m.pattern||'circle';
-      if(pat==='circle'){
-        if(d<m.range) hit=true;
-      } else if(pat==='cross'){
-        // 십자 (가로+세로 띠)
-        if(d<m.range && (Math.abs(dx)<m.range*0.45||Math.abs(dy)<m.range*0.45)) hit=true;
-      } else if(pat==='line'){
-        // 일자: 고정 각도 기준 ±20도 이내 직선
-        const da=Math.atan2(dy,dx)-m.lineAngle;
-        const nd=Math.cos(da)*d;
-        const td=Math.abs(Math.sin(da)*d);
-        if(nd>0&&nd<m.range*1.6&&td<40) hit=true;
-      } else if(pat==='spread'){
-        // 부채꼴 (120도)
-        const da=Math.atan2(dy,dx)-m.lineAngle;
-        const nda=Math.atan2(Math.sin(da),Math.cos(da));
-        if(d<m.range&&Math.abs(nda)<Math.PI/3) hit=true;
-      } else if(pat==='ring'){
-        // 링: range-20 ~ range+20 의 도넛 영역
-        if(d>m.range*0.5&&d<m.range*1.1) hit=true;
+
+      // 보스 페이즈마다 패턴 순환
+      if(m.type==='boss'){
+        m.bossPhase=(m.bossPhase+1)%4;
+        const bpat=['fill_cross','fill_scatter','fill_cone','fill_ring'][m.bossPhase];
+        m.attackStyle = m.enraged
+          ? ['fill_cross','fill_scatter','fill_cone','fill_scatter'][m.bossPhase]
+          : bpat;
       }
-      if(hit&&!shielded){
-        player.hp-=m.atk;
-        player.iframes=IFRAMES;
+
+      // ── 각 스타일별 공격 실행 ──────────────────────
+      function dealDamage(extra=0){
+        if(shielded) return;
+        const dmg = m.atk + extra;
+        player.hp -= dmg;
+        player.iframes = IFRAMES;
         spawnParticles(player.x,player.y,'#44aaff',5);
-        screenShake=14;
-        addLog(`피격! -${m.atk}HP`,'dmg');
+        screenShake = m.type==='boss'?22:14;
+        addLog(`피격! -${dmg}HP`,'dmg');
         if(player.hp<=0){
           player.hp=0; player.alive=false;
           addLog('💀 전투 불능...','death');
           gameRunning=false;
           setTimeout(()=>showEnding(false),900);
+        }
+      }
+
+      if(style==='fill_circle'){
+        // 원형 전방위 폭발
+        if(d < m.range) dealDamage();
+
+      } else if(style==='fill_cross'){
+        // 십자: 상하좌우 4개 직선 레이저 — 레이저 투사체 생성
+        [-0, Math.PI/2, Math.PI, Math.PI*1.5].forEach(offset=>{
+          const ang = m.aimAngle + offset;
+          bullets.push({
+            x:m.x, y:m.y,
+            vx:Math.cos(ang)*12, vy:Math.sin(ang)*12,
+            dist:0, angle:ang, alive:true,
+            isMob:true, dmg:m.atk, col:m.col, len:28, w:5,
+          });
+        });
+
+      } else if(style==='fill_cone'){
+        // 원뿔: aim 각도 기준 ±45도 안에 있으면 피해
+        const da = Math.atan2(dy,dx) - m.aimAngle;
+        const nda = Math.atan2(Math.sin(da),Math.cos(da));
+        if(d < m.range*1.1 && Math.abs(nda) < Math.PI/4) dealDamage(8);
+
+      } else if(style==='fill_line'){
+        // 레이저 직선: aim 각도로 긴 레이저 투사체 1발
+        bullets.push({
+          x:m.x, y:m.y,
+          vx:Math.cos(m.aimAngle)*14, vy:Math.sin(m.aimAngle)*14,
+          dist:0, angle:m.aimAngle, alive:true,
+          isMob:true, dmg:m.atk, col:m.col, len:40, w:7, pierce:true,
+        });
+
+      } else if(style==='fill_ring'){
+        // 링: 도넛 영역 피해 (range*0.5 ~ range*1.1)
+        if(d > m.range*0.4 && d < m.range*1.15) dealDamage();
+
+      } else if(style==='fill_scatter'){
+        // 산탄: 8방향으로 총알 퍼뜨림
+        for(let i=0;i<8;i++){
+          const ang = m.aimAngle + (Math.PI*2/8)*i;
+          bullets.push({
+            x:m.x, y:m.y,
+            vx:Math.cos(ang)*9, vy:Math.sin(ang)*9,
+            dist:0, angle:ang, alive:true,
+            isMob:true, dmg:m.atk, col:m.col, len:18, w:4,
+          });
         }
       }
     }
@@ -768,17 +816,41 @@ function update(){
   // ── 총알 업데이트 ────────────────────────────────
   bullets.forEach(b=>{
     if(!b.alive) return;
-    b.x+=b.vx; b.y+=b.vy; b.dist+=BULLET_SPEED;
-    if(b.dist>BULLET_RANGE||isWall(b.x,b.y)){ b.alive=false; return; }
-    monsters.forEach(m=>{
-      if(!m.alive||!b.alive) return;
-      if(Math.hypot(m.x-b.x,m.y-b.y)<m.size+4){
-        b.alive=false;
-        m.hp-=P_ATK;
-        spawnParticles(m.x,m.y,m.col,6);
-        if(m.hp<=0) killMonster(m);
+    const spd=Math.hypot(b.vx,b.vy);
+    b.x+=b.vx; b.y+=b.vy; b.dist+=spd;
+    const maxR = b.isMob ? (b.pierce?500:350) : BULLET_RANGE;
+    if(b.dist>maxR||isWall(b.x,b.y)){ b.alive=false; return; }
+
+    if(b.isMob){
+      // 몬스터 투사체 → 플레이어 공격
+      if(player.alive && shieldActive<=0 && player.iframes<=0){
+        if(Math.hypot(player.x-b.x,player.y-b.y)<14){
+          if(!b.pierce) b.alive=false;
+          player.hp-=b.dmg;
+          player.iframes=IFRAMES;
+          spawnParticles(player.x,player.y,'#44aaff',5);
+          screenShake=14;
+          addLog(`투사체 피격! -${b.dmg}HP`,'dmg');
+          if(player.hp<=0){
+            player.hp=0; player.alive=false;
+            addLog('💀 전투 불능...','death');
+            gameRunning=false;
+            setTimeout(()=>showEnding(false),900);
+          }
+        }
       }
-    });
+    } else {
+      // 플레이어 투사체 → 몬스터 공격
+      monsters.forEach(m=>{
+        if(!m.alive||!b.alive) return;
+        if(Math.hypot(m.x-b.x,m.y-b.y)<m.size+4){
+          b.alive=false;
+          m.hp-=P_ATK;
+          spawnParticles(m.x,m.y,m.col,6);
+          if(m.hp<=0) killMonster(m);
+        }
+      });
+    }
   });
   bullets=bullets.filter(b=>b.alive);
 
@@ -943,58 +1015,166 @@ function draw(){
     }
   }
 
-  // ── 위험 범위 (채워지는 원으로 공격 타이밍 표시) ──
+  // ── 위험 범위 — 패턴별 시각화 (채워지면 그 모양으로 공격) ──
   monsters.forEach(m=>{
     if(!m.alive||!m.warnPhase) return;
     const sx=m.x-camX, sy=m.y-camY;
     const ddx=m.x-px, ddy=m.y-py;
-    if(ddx*ddx+ddy*ddy>(SIGHT_R+m.range+20)*(SIGHT_R+m.range+20)) return;
-    const ratio=1-m.attackCd/m.warn; // 0→1 (공격 임박할수록 1)
-    const isBoss=m.type==='boss';
+    if(ddx*ddx+ddy*ddy>(SIGHT_R+m.range+60)*(SIGHT_R+m.range+60)) return;
+
+    const ratio = 1 - m.attackCd/m.warn;  // 0→1
+    const r2=ratio*ratio;
+    const red = Math.min(255, 60+195*r2|0);
+    const grn = Math.min(255, 230-200*r2|0);
+    const fc = `rgb(${red},${grn},20)`;    // 초록→노랑→빨강
+    const fc0 = `rgba(${red},${grn},20,0)`;
+    const style = m.attackStyle||'fill_circle';
+    const ang = m.aimAngle||0;
     ctx.save();
 
-    // ① 배경 원 (회색 테두리 — 최대 범위 표시)
-    ctx.globalAlpha=0.55;
-    ctx.strokeStyle=isBoss?'#885500':'#882222';
-    ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(sx,sy,m.range,0,Math.PI*2); ctx.stroke();
-
-    // ② 채워지는 부채꼴 (시계방향, ratio 만큼 채움)
-    // 색: 초록→노랑→빨강 으로 변함
-    const r2=ratio*ratio;
-    const red=Math.min(255, Math.round(80+175*r2)  );
-    const grn=Math.min(255, Math.round(220-180*r2) );
-    const fillCol=`rgb(${red},${grn},30)`;
-
-    ctx.globalAlpha=0.22+ratio*0.28;
-    ctx.fillStyle=fillCol;
-    ctx.beginPath();
-    ctx.moveTo(sx,sy);
-    ctx.arc(sx,sy,m.range, -Math.PI/2, -Math.PI/2 + Math.PI*2*ratio);
-    ctx.closePath();
-    ctx.fill();
-
-    // ③ 테두리 원 (점점 밝아짐)
-    ctx.globalAlpha=0.4+ratio*0.55;
-    ctx.strokeStyle=fillCol;
-    ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.arc(sx,sy,m.range,0,Math.PI*2); ctx.stroke();
-
-    // ④ 보스: 십자 영역도 같이 채움
-    if(isBoss){
-      ctx.globalAlpha=0.04+ratio*0.13;
-      ctx.fillStyle=fillCol;
-      ctx.fillRect(sx-m.range*1.4,sy-36,m.range*2.8,72);
-      ctx.fillRect(sx-36,sy-m.range*1.4,72,m.range*2.8);
+    // ── fill_circle: 원이 안에서 밖으로 채워짐 ──────
+    if(style==='fill_circle'){
+      // 외곽 테두리 (고정)
+      ctx.globalAlpha=0.45; ctx.strokeStyle='#663';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(sx,sy,m.range,0,Math.PI*2); ctx.stroke();
+      // 채워지는 원 (작은→큰)
+      const fillR = m.range * ratio;
+      ctx.globalAlpha=0.18+ratio*0.22;
+      ctx.fillStyle=fc;
+      ctx.beginPath(); ctx.arc(sx,sy,fillR,0,Math.PI*2); ctx.fill();
+      // 테두리 원
+      ctx.globalAlpha=0.5+ratio*0.45;
+      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(sx,sy,fillR,0,Math.PI*2); ctx.stroke();
     }
 
-    // ⑤ 경고 아이콘 (마지막 20% 구간에서만)
+    // ── fill_cross: 십자 4방향 바가 뻗어나옴 ────────
+    else if(style==='fill_cross'){
+      const arm = m.range * ratio;
+      const thick = 18+ratio*10;
+      ctx.globalAlpha=0.12+ratio*0.22;
+      ctx.fillStyle=fc;
+      // 십자 4방향 막대 (ang 기준 회전)
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
+      ctx.fillRect(-arm,-thick/2,arm*2,thick);
+      ctx.fillRect(-thick/2,-arm,thick,arm*2);
+      ctx.restore();
+      // 외곽 십자 테두리 (최대 범위)
+      ctx.globalAlpha=0.35+ratio*0.5;
+      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
+      ctx.strokeRect(-m.range,-thick/2*1.2,m.range*2,thick*1.2);
+      ctx.strokeRect(-thick/2*1.2,-m.range,thick*1.2,m.range*2);
+      ctx.restore();
+    }
+
+    // ── fill_cone: 원뿔(쐐기)이 ratio만큼 채워짐 ────
+    else if(style==='fill_cone'){
+      const coneAngle = Math.PI/4; // 45도 반각 → 90도 원뿔
+      // 최대 범위 윤곽
+      ctx.globalAlpha=0.35;
+      ctx.strokeStyle='#663'; ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.arc(sx,sy,m.range*1.1,ang-coneAngle,ang+coneAngle);
+      ctx.closePath(); ctx.stroke();
+      // 채워지는 원뿔
+      const coneR = m.range * ratio;
+      ctx.globalAlpha=0.18+ratio*0.28;
+      ctx.fillStyle=fc;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.arc(sx,sy,coneR,ang-coneAngle,ang+coneAngle);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=0.45+ratio*0.5;
+      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(sx,sy);
+      ctx.arc(sx,sy,coneR,ang-coneAngle,ang+coneAngle);
+      ctx.closePath(); ctx.stroke();
+    }
+
+    // ── fill_line: 직선 바가 ratio만큼 뻗어나옴 ─────
+    else if(style==='fill_line'){
+      const maxLen = m.range*1.8;
+      const lineLen = maxLen * ratio;
+      const thick = 22;
+      // 최대 범위 외곽
+      ctx.globalAlpha=0.3; ctx.strokeStyle='#446';
+      ctx.lineWidth=1.5;
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
+      ctx.strokeRect(0,-thick/2,maxLen,thick);
+      ctx.restore();
+      // 채워지는 막대
+      ctx.globalAlpha=0.15+ratio*0.25;
+      ctx.fillStyle=fc;
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
+      ctx.fillRect(0,-thick/2,lineLen,thick);
+      ctx.restore();
+      // 테두리 막대
+      ctx.globalAlpha=0.5+ratio*0.45;
+      ctx.strokeStyle=fc; ctx.lineWidth=2.5;
+      ctx.save(); ctx.translate(sx,sy); ctx.rotate(ang);
+      ctx.strokeRect(0,-thick/2,lineLen,thick);
+      ctx.restore();
+    }
+
+    // ── fill_ring: 바깥 링이 안으로 수축 ─────────────
+    else if(style==='fill_ring'){
+      const outerR = m.range * 1.2;
+      const innerR = outerR * (1 - ratio * 0.6); // 수축
+      // 외곽 고정
+      ctx.globalAlpha=0.35; ctx.strokeStyle='#663';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(sx,sy,outerR,0,Math.PI*2); ctx.stroke();
+      // 수축하는 링 도넛
+      ctx.globalAlpha=0.15+ratio*0.28;
+      ctx.fillStyle=fc;
+      ctx.beginPath();
+      ctx.arc(sx,sy,outerR,0,Math.PI*2,false);
+      ctx.arc(sx,sy,innerR,0,Math.PI*2,true);
+      ctx.fill();
+      ctx.globalAlpha=0.5+ratio*0.45;
+      ctx.strokeStyle=fc; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(sx,sy,innerR,0,Math.PI*2); ctx.stroke();
+    }
+
+    // ── fill_scatter: 원 안에서 방사형 화살표들이 퍼짐 ─
+    else if(style==='fill_scatter'){
+      // 배경 원
+      ctx.globalAlpha=0.3; ctx.strokeStyle='#663';
+      ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(sx,sy,m.range,0,Math.PI*2); ctx.stroke();
+      // 8방향 화살표 선 (ratio만큼 길어짐)
+      ctx.globalAlpha=0.55+ratio*0.4;
+      ctx.strokeStyle=fc; ctx.lineWidth=2; ctx.lineCap='round';
+      for(let i=0;i<8;i++){
+        const a = ang + (Math.PI*2/8)*i;
+        const alen = m.range*0.85*ratio;
+        const ex = sx+Math.cos(a)*alen, ey=sy+Math.sin(a)*alen;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+        // 화살 머리
+        if(ratio>0.5){
+          const ha=0.4;
+          ctx.beginPath();
+          ctx.moveTo(ex,ey);
+          ctx.lineTo(ex-Math.cos(a-ha)*10,ey-Math.sin(a-ha)*10);
+          ctx.moveTo(ex,ey);
+          ctx.lineTo(ex-Math.cos(a+ha)*10,ey-Math.sin(a+ha)*10);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 경고 아이콘 (마지막 20%)
     if(ratio>0.8){
-      ctx.globalAlpha=(ratio-0.8)/0.2;
+      const alertRatio=(ratio-0.8)/0.2;
+      ctx.globalAlpha=alertRatio;
       ctx.fillStyle='#fff';
-      ctx.font=`bold ${13+ratio*5}px serif`;
+      ctx.font=`bold ${(12+ratio*5)|0}px serif`;
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText('⚠',sx,sy-m.range-9);
+      ctx.fillText('⚠', sx, sy - m.range - 12);
     }
     ctx.restore();
   });
@@ -1002,23 +1182,36 @@ function draw(){
   // ── 총알 렌더링 ──────────────────────────────────
   bullets.forEach(b=>{
     const sx=b.x-camX, sy=b.y-camY;
-    const tailX=sx-Math.cos(b.angle)*BULLET_LEN;
-    const tailY=sy-Math.sin(b.angle)*BULLET_LEN;
+    const blen = b.len||BULLET_LEN;
+    const tailX=sx-Math.cos(b.angle)*blen;
+    const tailY=sy-Math.sin(b.angle)*blen;
     ctx.save();
-    // 글로우
-    ctx.shadowColor='#88ddff'; ctx.shadowBlur=10;
-    // 총알 선
-    const grad=ctx.createLinearGradient(tailX,tailY,sx,sy);
-    grad.addColorStop(0,'rgba(68,170,255,0)');
-    grad.addColorStop(0.4,'rgba(100,200,255,0.7)');
-    grad.addColorStop(1,'rgba(220,240,255,1)');
-    ctx.strokeStyle=grad;
-    ctx.lineWidth=3.5; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(tailX,tailY); ctx.lineTo(sx,sy); ctx.stroke();
-    // 총알 앞 빛점
-    ctx.shadowBlur=16;
-    ctx.fillStyle='#ffffff';
-    ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+    if(b.isMob){
+      // 몬스터 투사체: 붉은/주황 색
+      const mc = b.col||'#f44';
+      ctx.shadowColor=mc; ctx.shadowBlur=12;
+      const grad=ctx.createLinearGradient(tailX,tailY,sx,sy);
+      grad.addColorStop(0,'rgba(0,0,0,0)');
+      grad.addColorStop(0.3,mc+'aa');
+      grad.addColorStop(1,mc);
+      ctx.strokeStyle=grad;
+      ctx.lineWidth=b.w||4; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(tailX,tailY); ctx.lineTo(sx,sy); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.shadowBlur=18;
+      ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+    } else {
+      // 플레이어 투사체: 파란색
+      ctx.shadowColor='#88ddff'; ctx.shadowBlur=10;
+      const grad=ctx.createLinearGradient(tailX,tailY,sx,sy);
+      grad.addColorStop(0,'rgba(68,170,255,0)');
+      grad.addColorStop(0.4,'rgba(100,200,255,0.7)');
+      grad.addColorStop(1,'rgba(220,240,255,1)');
+      ctx.strokeStyle=grad;
+      ctx.lineWidth=3.5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(tailX,tailY); ctx.lineTo(sx,sy); ctx.stroke();
+      ctx.shadowBlur=16; ctx.fillStyle='#ffffff';
+      ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+    }
     ctx.restore();
   });
 
