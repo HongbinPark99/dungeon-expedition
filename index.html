@@ -1191,7 +1191,7 @@ function draw(){
       ctx.shadowColor=mc; ctx.shadowBlur=12;
       const grad=ctx.createLinearGradient(tailX,tailY,sx,sy);
       grad.addColorStop(0,'rgba(0,0,0,0)');
-      grad.addColorStop(0.3,mc+'aa');
+      grad.addColorStop(0.3,mc);   // hex+aa 는 잘못된 색상 → 그냥 mc 사용
       grad.addColorStop(1,mc);
       ctx.strokeStyle=grad;
       ctx.lineWidth=b.w||4; ctx.lineCap='round';
@@ -1302,27 +1302,34 @@ function draw(){
     ctx.restore();
   });
 
-  // ── Fog of War — 4개 코너 삼각형으로 시야 원 밖을 가림 ──
-  // clipPath 없이 순수 fillRect + 원형 그라디언트로 처리
-  // 플레이어는 항상 fog 위에 그림
+  // ── Fog of War — 오프스크린 캔버스에 fog 완성 후 drawImage ──
+  // destination-out 을 오프스크린에서만 사용 → 메인 캔버스 픽셀 안 건드림
+  // 플레이어는 아래쪽에서 메인 캔버스에 직접 그려 항상 보임
   {
     const psx=player.x-camX, psy=player.y-camY;
-    // 시야 원 바깥을 어둡게: 화면 전체를 어두운 색으로 채우되
-    // 시야 원 부분은 radialGradient로 투명하게 뚫음
-    // → ctx.save/restore로 globalCompositeOperation 격리
-    ctx.save();
-    // 전체 어두운 레이어
-    ctx.fillStyle='rgba(5,8,16,0.92)';
-    ctx.fillRect(-10,-10,W+20,H+20);
-    // 시야 원: destination-out으로 구멍
-    ctx.globalCompositeOperation='destination-out';
-    const fogGrad=ctx.createRadialGradient(psx,psy,SIGHT_R*0.4,psx,psy,SIGHT_R);
-    fogGrad.addColorStop(0,  'rgba(0,0,0,1)');
-    fogGrad.addColorStop(0.65,'rgba(0,0,0,0.95)');
-    fogGrad.addColorStop(1,  'rgba(0,0,0,0)');
-    ctx.fillStyle=fogGrad;
-    ctx.beginPath(); ctx.arc(psx,psy,SIGHT_R,0,Math.PI*2); ctx.fill();
-    ctx.restore(); // ← compositeOperation 원복, 이후 그리기는 정상 source-over
+    // 오프스크린 캔버스 준비 (전역 재사용)
+    if(!window._fog || window._fog.width!==W || window._fog.height!==H){
+      window._fog = document.createElement('canvas');
+      window._fog.width=W; window._fog.height=H;
+      window._fogC = window._fog.getContext('2d');
+    }
+    const fc2=window._fogC;
+    // 매 프레임: 오프스크린 초기화
+    fc2.clearRect(0,0,W,H);
+    // 전체를 어둡게
+    fc2.fillStyle='rgba(5,8,16,0.93)';
+    fc2.fillRect(0,0,W,H);
+    // 시야 원만 destination-out으로 투명하게
+    fc2.globalCompositeOperation='destination-out';
+    const fg=fc2.createRadialGradient(psx,psy,SIGHT_R*0.35,psx,psy,SIGHT_R);
+    fg.addColorStop(0,  'rgba(0,0,0,1)');
+    fg.addColorStop(0.6,'rgba(0,0,0,0.92)');
+    fg.addColorStop(1,  'rgba(0,0,0,0)');
+    fc2.fillStyle=fg;
+    fc2.beginPath(); fc2.arc(psx,psy,SIGHT_R,0,Math.PI*2); fc2.fill();
+    fc2.globalCompositeOperation='source-over'; // 오프스크린 원복
+    // 완성된 fog 레이어를 메인 캔버스에 올림
+    ctx.drawImage(window._fog,0,0);
   }
 
   // ── 파티클 (fog 위) ───────────────────────────────
