@@ -139,6 +139,39 @@ canvas{display:block;}
   transition:.15s;
 }
 #retry-btn:hover{transform:translateY(-2px);}
+
+/* ── 스킬 바 ── */
+#skill-bar{
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  display:flex;gap:10px;z-index:10;pointer-events:none;
+}
+.skill-slot{
+  width:52px;height:52px;border-radius:10px;
+  background:#0a0c1acc;border:2px solid #2a2d50;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;backdrop-filter:blur(6px);font-size:1.4rem;
+}
+.skill-slot .sk-key{
+  position:absolute;top:2px;left:4px;
+  font-size:.5rem;color:#888;font-family:'Noto Sans KR';
+}
+.skill-slot .sk-cd{
+  position:absolute;bottom:0;left:0;right:0;
+  background:#0008;border-radius:0 0 8px 8px;
+  font-size:.55rem;color:#aac;text-align:center;padding:1px 0;
+}
+.skill-slot.ready{border-color:#44aaff;box-shadow:0 0 10px #44aaff44;}
+.skill-slot.active{border-color:#fff;box-shadow:0 0 18px #fff6;}
+
+/* ── 아이템 목록 ── */
+#item-tray{
+  position:fixed;top:60px;left:14px;
+  background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;
+  padding:8px 10px;backdrop-filter:blur(6px);z-index:10;
+  font-size:.65rem;color:#99b;min-width:110px;
+}
+#item-tray .it-title{color:#d4a832;font-weight:700;margin-bottom:5px;font-size:.68rem;}
+.it-row{display:flex;align-items:center;gap:6px;line-height:1.9;}
 </style>
 </head>
 <body>
@@ -148,9 +181,10 @@ canvas{display:block;}
   <h1>⚔ 던전 원정대</h1>
   <div class="lobby-sub">어둠의 던전을 탐험하라</div>
   <div class="key-box">
-    <b>↑ ↓ ← →</b> 이동 &nbsp;|&nbsp; <b>SPACE</b> 공격<br>
-    안개 속에 숨겨진 <b>보스 방</b>을 찾아라<br>
-    몬스터 공격 전 <b style="color:#f44">붉은 범위</b>가 표시됩니다 — 피하세요!
+    <b>↑↓←→</b> 이동 &nbsp;|&nbsp; <b>SPACE</b> 총알 발사<br>
+    <b>Z</b> 폭탄 투척 &nbsp;|&nbsp; <b>X</b> 방패막 &nbsp;|&nbsp; <b>C</b> 번개 범위공격<br>
+    안개 속 보스 방 탐험 · 아이템 드랍 획득<br>
+    몬스터 패턴을 읽고 피하며 싸워라!
   </div>
   <button id="start-btn">탐험 시작</button>
 </div>
@@ -170,7 +204,19 @@ canvas{display:block;}
       스테이지: <span id="s-stage">탐험중</span>
     </div>
   </div>
-  <div id="hint">↑↓←→ 이동 | SPACE 공격<br>보스 방을 찾아라!</div>
+  <div id="hint">↑↓←→ 이동 | SPACE 공격<br>Z 폭탄 | X 방패막 | C 범위공격<br>보스 방을 찾아라!</div>
+
+  <div id="skill-bar">
+    <div class="skill-slot" id="sk0"><span class="sk-key">SPACE</span>🔫<span class="sk-cd" id="sk0cd"></span></div>
+    <div class="skill-slot" id="sk1"><span class="sk-key">Z</span>💣<span class="sk-cd" id="sk1cd"></span></div>
+    <div class="skill-slot" id="sk2"><span class="sk-key">X</span>🛡<span class="sk-cd" id="sk2cd"></span></div>
+    <div class="skill-slot" id="sk3"><span class="sk-key">C</span>⚡<span class="sk-cd" id="sk3cd"></span></div>
+  </div>
+
+  <div id="item-tray">
+    <div class="it-title">🎒 보유 아이템</div>
+    <div id="item-list"><div class="it-row" style="color:#556">없음</div></div>
+  </div>
 
   <div id="boss-bar">
     <div id="boss-title">👑 던전의 군주</div>
@@ -209,9 +255,13 @@ const P_ATK   = 32;
 const P_RANGE = 68;
 const P_CD    = 22;
 const IFRAMES = 48;
-const BULLET_SPEED = 9;
-const BULLET_LEN   = 22;   // 총알 길이(px)
-const BULLET_RANGE = 340;  // 최대 사거리
+const BULLET_SPEED = 10;
+const BULLET_LEN   = 24;
+const BULLET_RANGE = 360;
+// 스킬 쿨다운 (프레임)
+const CD_BOMB    = 360;  // Z: 폭탄 6초
+const CD_SHIELD  = 480;  // X: 방패 8초
+const CD_THUNDER = 300;  // C: 번개 5초
 
 // ═══════════════════════════════════════════════════════
 //  캔버스
@@ -307,7 +357,9 @@ function moveSlide(ox,oy,nx,ny,r=13){
 let player, monsters, particles, attackFx;
 let camX=0, camY=0;
 let kills=0, tick=0;
-let bullets=[];
+let bullets=[], bombs=[], dangerZonesFx=[], items=[];
+let skillCd={bomb:0, shield:0, thunder:0};
+let shieldActive=0; // 방패 지속 프레임
 let bossArena, bossSpawned=false, bossDefeated=false;
 let gameRunning=false, gameWon=false, gameOver=false;
 let screenShake=0;
@@ -318,6 +370,9 @@ const keys={};
 document.addEventListener('keydown',e=>{
   keys[e.key]=true;
   if(e.key===' '){e.preventDefault(); doAttack();}
+  if(e.key==='z'||e.key==='Z') doSkillBomb();
+  if(e.key==='x'||e.key==='X') doSkillShield();
+  if(e.key==='c'||e.key==='C') doSkillThunder();
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup',e=>{ keys[e.key]=false; });
@@ -341,6 +396,11 @@ function initGame(){
   particles    = [];
   attackFx     = [];
   bullets      = [];
+  bombs        = [];
+  dangerZonesFx= [];
+  items        = [];
+  skillCd      = {bomb:0, shield:0, thunder:0};
+  shieldActive = 0;
   monsters     = [];
 
   // 시작 위치 (첫 번째 방 중앙)
@@ -371,20 +431,22 @@ function initGame(){
 // ═══════════════════════════════════════════════════════
 //  몬스터
 // ═══════════════════════════════════════════════════════
+// pattern: 'circle'=원형, 'line'=일자, 'cross'=십자, 'spread'=방사, 'ring'=링
 const MTYPE = {
-  goblin:{ hp:50,  atk:16, spd:1.9, range:50,  warn:85,  cd:105, size:12, score:10, col:'#3d8' },
-  orc:   { hp:95,  atk:28, spd:1.2, range:58,  warn:100, cd:130, size:17, score:20, col:'#e74' },
-  shade: { hp:40,  atk:20, spd:2.7, range:42,  warn:72,  cd:90,  size:11, score:15, col:'#88f' },
-  archer:{ hp:55,  atk:22, spd:1.0, range:145, warn:135, cd:140, size:13, score:18, col:'#4b8' },
-  boss:  { hp:900, atk:50, spd:1.3, range:95,  warn:140, cd:155, size:30, score:500,col:'#f40' },
+  goblin:{ hp:50,  atk:16, spd:1.9, range:55,  warn:90,  cd:110, size:12, score:10, col:'#3d8', pattern:'circle' },
+  orc:   { hp:100, atk:30, spd:1.2, range:70,  warn:105, cd:140, size:17, score:20, col:'#e74', pattern:'cross'  },
+  shade: { hp:42,  atk:20, spd:2.8, range:48,  warn:75,  cd:95,  size:11, score:15, col:'#88f', pattern:'spread' },
+  archer:{ hp:60,  atk:22, spd:1.0, range:160, warn:140, cd:150, size:13, score:18, col:'#4b8', pattern:'line'   },
+  mage:  { hp:70,  atk:28, spd:0.9, range:100, warn:120, cd:160, size:14, score:25, col:'#b6f', pattern:'ring'   },
+  boss:  { hp:900, atk:50, spd:1.3, range:110, warn:150, cd:170, size:30, score:500,col:'#f40', pattern:'cross'  },
 };
-const MEMOJI={ goblin:'👺',orc:'👹',shade:'👻',archer:'🏹',boss:'👑' };
+const MEMOJI={ goblin:'👺',orc:'👹',shade:'👻',archer:'🏹',mage:'🔮',boss:'👑' };
 let nextId=1;
 
 function spawnMonster(type){
   // 랜덤 빈 타일 위치 (보스 방 밖)
   let x,y,tries=0;
-  const types=['goblin','orc','shade','archer'];
+  const types=['goblin','orc','shade','archer','mage'];
   type = type || types[Math.random()*types.length|0];
   do {
     x = (1+Math.random()*(COLS-2))*TILE;
@@ -404,9 +466,11 @@ function spawnMonster(type){
     range:cfg.range, warn:cfg.warn,
     cd:cfg.cd, size:cfg.size,
     score:cfg.score, col:cfg.col,
+    pattern:cfg.pattern||'circle',
     attackCd: (Math.random()*cfg.cd)|0,
     warnPhase:false, alive:true,
     enraged:false, phase:0,
+    lineAngle:0, // line/spread 패턴용 고정 각도
   });
 }
 
@@ -437,15 +501,8 @@ function spawnBoss(){
 function doAttack(){
   if(!gameRunning||!player.alive||player.attackCd>0) return;
   player.attackCd=P_CD;
-  // 가장 가까운 몬스터 방향으로 조준, 없으면 facing 방향
-  let angle=player.facing||0;
-  let nearest=null, nearD=Infinity;
-  monsters.forEach(m=>{
-    if(!m.alive) return;
-    const d=Math.hypot(m.x-player.x,m.y-player.y);
-    if(d<nearD){ nearD=d; nearest=m; }
-  });
-  if(nearest) angle=Math.atan2(nearest.y-player.y, nearest.x-player.x);
+  // 마지막 이동 방향으로 발사 (유도 없음)
+  const angle = player.facing !== undefined ? player.facing : 0;
   bullets.push({
     x:player.x, y:player.y,
     vx:Math.cos(angle)*BULLET_SPEED,
@@ -454,9 +511,55 @@ function doAttack(){
   });
 }
 
+function doSkillBomb(){
+  if(!gameRunning||!player.alive||skillCd.bomb>0) return;
+  skillCd.bomb=CD_BOMB;
+  const angle=player.facing!==undefined?player.facing:0;
+  bombs.push({
+    x:player.x, y:player.y,
+    vx:Math.cos(angle)*5, vy:Math.sin(angle)*5,
+    dist:0, maxDist:200, exploded:false, explodeTimer:0,
+    radius:0, maxRadius:90, alive:true,
+  });
+  addLog('💣 폭탄 투척!');
+}
+
+function doSkillShield(){
+  if(!gameRunning||!player.alive||skillCd.shield>0) return;
+  skillCd.shield=CD_SHIELD;
+  shieldActive=120; // 2초 방패
+  addLog('🛡 방패막 발동! 2초간 무적');
+}
+
+function doSkillThunder(){
+  if(!gameRunning||!player.alive||skillCd.thunder>0) return;
+  skillCd.thunder=CD_THUNDER;
+  // 주변 반경 180 내 모든 몬스터에 번개 피해
+  const THUNDER_R=180, THUNDER_DMG=55;
+  let hit=0;
+  monsters.forEach(m=>{
+    if(!m.alive) return;
+    if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
+      m.hp-=THUNDER_DMG;
+      spawnParticles(m.x,m.y,'#ccf',10);
+      hit++;
+      if(m.hp<=0) killMonster(m);
+    }
+  });
+  // 번개 시각 이펙트
+  dangerZonesFx.push({x:player.x,y:player.y,r:THUNDER_R,life:25,col:'#aaf',type:'thunder'});
+  addLog(`⚡ 번개 범위공격! ${hit}마리 피격`,'kill');
+}
+
 function killMonster(m){
   m.alive=false; kills++;
   spawnParticles(m.x,m.y,'#ffd700',16);
+  // 아이템 드랍 (30% 확률)
+  if(Math.random()<0.30){
+    const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
+    const it=iTypes[Math.random()*iTypes.length|0];
+    items.push({x:m.x,y:m.y,type:it,life:600,pulse:0});
+  }
   if(m.type==='boss'){
     bossDefeated=true; gameWon=true; gameRunning=false;
     addLog('🏆 던전의 군주 처치! 원정 성공!','win');
@@ -465,6 +568,9 @@ function killMonster(m){
     addLog(`${MEMOJI[m.type]} ${m.type} 처치! +${m.score}점`,'kill');
   }
 }
+
+const ITEM_EMOJI={hp:'❤️',bomb_charge:'💣',shield_charge:'🛡',thunder_charge:'⚡',speed:'👟'};
+const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_charge:'#ccf',speed:'#4f8'};
 
 // ═══════════════════════════════════════════════════════
 //  파티클
@@ -496,9 +602,10 @@ function update(){
     if(keys['ArrowRight']||keys['d']||keys['D']) dx+=1;
     if(dx||dy){
       const len=Math.hypot(dx,dy);
-      player.facing = Math.atan2(dy,dx); // 마지막 이동 방향 저장
-      const nx=player.x+(dx/len)*P_SPEED;
-      const ny=player.y+(dy/len)*P_SPEED;
+      player.facing = Math.atan2(dy,dx);
+      const spd2 = P_SPEED*(player.speedBoost>0?1.7:1);
+      const nx=player.x+(dx/len)*spd2;
+      const ny=player.y+(dy/len)*spd2;
       const r=moveSlide(player.x,player.y,nx,ny);
       player.x=Math.max(TILE,Math.min(MAP_W-TILE,r.x));
       player.y=Math.max(TILE,Math.min(MAP_H-TILE,r.y));
@@ -538,23 +645,44 @@ function update(){
       addLog('🔥 보스가 격노했습니다!','boss');
     }
 
+    // 경고 단계 시작 시 패턴 각도 고정 (일자/방사용)
+    if(m.attackCd===m.warn){
+      m.lineAngle=Math.atan2(dy,dx);
+    }
+
     // 공격
     if(m.attackCd<=0){
       m.attackCd = m.enraged?(m.cd*0.68)|0 : m.cd;
-      if(!player.alive||player.iframes>0) return;
+      if(!player.alive) return;
+      // 방패 중이면 피해 없음
+      const shielded = shieldActive>0 || player.iframes>0;
       let hit=false;
-      if(m.type==='boss'){
-        // 원형 + 십자
+      const pat=m.pattern||'circle';
+      if(pat==='circle'){
         if(d<m.range) hit=true;
-        if(Math.abs(dx)<45&&Math.abs(dy)<m.range*1.3) hit=true;
-      } else {
-        if(d<m.range) hit=true;
+      } else if(pat==='cross'){
+        // 십자 (가로+세로 띠)
+        if(d<m.range && (Math.abs(dx)<m.range*0.45||Math.abs(dy)<m.range*0.45)) hit=true;
+      } else if(pat==='line'){
+        // 일자: 고정 각도 기준 ±20도 이내 직선
+        const da=Math.atan2(dy,dx)-m.lineAngle;
+        const nd=Math.cos(da)*d;
+        const td=Math.abs(Math.sin(da)*d);
+        if(nd>0&&nd<m.range*1.6&&td<40) hit=true;
+      } else if(pat==='spread'){
+        // 부채꼴 (120도)
+        const da=Math.atan2(dy,dx)-m.lineAngle;
+        const nda=Math.atan2(Math.sin(da),Math.cos(da));
+        if(d<m.range&&Math.abs(nda)<Math.PI/3) hit=true;
+      } else if(pat==='ring'){
+        // 링: range-20 ~ range+20 의 도넛 영역
+        if(d>m.range*0.5&&d<m.range*1.1) hit=true;
       }
-      if(hit){
+      if(hit&&!shielded){
         player.hp-=m.atk;
         player.iframes=IFRAMES;
         spawnParticles(player.x,player.y,'#44aaff',5);
-        screenShake=12;
+        screenShake=14;
         addLog(`피격! -${m.atk}HP`,'dmg');
         if(player.hp<=0){
           player.hp=0; player.alive=false;
@@ -574,6 +702,68 @@ function update(){
     if(normal<22) for(let i=0;i<4;i++) spawnMonster();
   }
   monsters=monsters.filter(m=>m.alive);
+
+  // ── 쿨다운 감소 ──────────────────────────────────
+  if(skillCd.bomb>0)    skillCd.bomb--;
+  if(skillCd.shield>0)  skillCd.shield--;
+  if(skillCd.thunder>0) skillCd.thunder--;
+  if(shieldActive>0)    shieldActive--;
+
+  // ── 아이템 픽업 ──────────────────────────────────
+  items.forEach(it=>{
+    it.life--; it.pulse++;
+    if(!player.alive) return;
+    if(Math.hypot(it.x-player.x,it.y-player.y)<22){
+      it.life=0;
+      if(it.type==='hp'){
+        player.hp=Math.min(player.maxHp,player.hp+30);
+        addLog('❤️ HP +30 회복','win');
+      } else if(it.type==='bomb_charge'){
+        skillCd.bomb=0;
+        addLog('💣 폭탄 충전!','win');
+      } else if(it.type==='shield_charge'){
+        skillCd.shield=0;
+        addLog('🛡 방패 충전!','win');
+      } else if(it.type==='thunder_charge'){
+        skillCd.thunder=0;
+        addLog('⚡ 번개 충전!','win');
+      } else if(it.type==='speed'){
+        player.speedBoost=(player.speedBoost||0)+180;
+        addLog('👟 속도 부스트 3초!','win');
+      }
+      spawnParticles(it.x,it.y,ITEM_COL[it.type],12);
+    }
+  });
+  items=items.filter(it=>it.life>0);
+  if(player.speedBoost>0) player.speedBoost--;
+
+  // ── 폭탄 업데이트 ────────────────────────────────
+  bombs.forEach(b=>{
+    if(b.exploded){
+      b.explodeTimer++;
+      b.radius=b.maxRadius*(b.explodeTimer/20);
+      if(b.explodeTimer>=20){ b.alive=false; return; }
+      // 폭발 피해
+      if(b.explodeTimer===5){
+        monsters.forEach(m=>{
+          if(!m.alive) return;
+          if(Math.hypot(m.x-b.x,m.y-b.y)<b.maxRadius){
+            m.hp-=80;
+            spawnParticles(m.x,m.y,'#f84',8);
+            if(m.hp<=0) killMonster(m);
+          }
+        });
+        screenShake=25;
+        dangerZonesFx.push({x:b.x,y:b.y,r:b.maxRadius,life:18,col:'#f84',type:'bomb'});
+      }
+    } else {
+      b.x+=b.vx; b.y+=b.vy; b.dist+=5;
+      if(b.dist>b.maxDist||isWall(b.x,b.y)) b.exploded=true;
+    }
+  });
+  bombs=bombs.filter(b=>b.alive);
+  dangerZonesFx.forEach(d=>d.life--);
+  dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
 
   // ── 총알 업데이트 ────────────────────────────────
   bullets.forEach(b=>{
@@ -613,6 +803,40 @@ function update(){
   document.getElementById('hf0').style.width=pct+'%';
   document.getElementById('hn0').textContent=Math.max(0,player.hp)+' / '+player.maxHp;
   document.getElementById('s-kills').textContent=kills;
+
+  // 스킬 쿨다운 표시
+  const skillDefs=[
+    {id:'sk0',cd:player.attackCd,max:P_CD},
+    {id:'sk1',cd:skillCd.bomb,max:CD_BOMB},
+    {id:'sk2',cd:skillCd.shield,max:CD_SHIELD},
+    {id:'sk3',cd:skillCd.thunder,max:CD_THUNDER},
+  ];
+  skillDefs.forEach(s=>{
+    const el=document.getElementById(s.id);
+    const cdEl=document.getElementById(s.id+'cd');
+    if(!el||!cdEl) return;
+    if(s.cd<=0){
+      el.className='skill-slot ready';
+      cdEl.textContent='준비';
+    } else {
+      el.className='skill-slot';
+      cdEl.textContent=`${(s.cd/60).toFixed(1)}s`;
+    }
+  });
+  // 방패 활성 표시
+  const sk2=document.getElementById('sk2');
+  if(sk2&&shieldActive>0) sk2.className='skill-slot active';
+
+  // 아이템 목록
+  const itemCounts={};
+  items.forEach(it=>{ itemCounts[it.type]=(itemCounts[it.type]||0)+1; });
+  const itEl=document.getElementById('item-list');
+  if(itEl){
+    const entries=Object.entries(itemCounts);
+    itEl.innerHTML=entries.length===0
+      ? '<div class="it-row" style="color:#556">없음</div>'
+      : entries.map(([t,n])=>`<div class="it-row">${ITEM_EMOJI[t]} x${n}</div>`).join('');
+  }
 
   const boss=monsters.find(m=>m.type==='boss'&&m.alive);
   if(boss){
@@ -833,6 +1057,59 @@ function draw(){
     ctx.restore();
   });
 
+  // ── 폭탄 렌더 ────────────────────────────────────
+  bombs.forEach(b=>{
+    const sx=b.x-camX, sy=b.y-camY;
+    ctx.save();
+    if(b.exploded){
+      const t=b.explodeTimer/20;
+      ctx.globalAlpha=(1-t)*0.7;
+      ctx.fillStyle='#f84';
+      ctx.beginPath(); ctx.arc(sx,sy,b.radius,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='#ff0'; ctx.lineWidth=3; ctx.globalAlpha=(1-t)*0.9;
+      ctx.beginPath(); ctx.arc(sx,sy,b.radius,0,Math.PI*2); ctx.stroke();
+    } else {
+      ctx.shadowColor='#f84'; ctx.shadowBlur=12;
+      ctx.fillStyle='#f84';
+      const pulse=0.8+0.2*Math.sin(tick*0.3);
+      ctx.beginPath(); ctx.arc(sx,sy,8*pulse,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff0';
+      ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  });
+
+  // ── 스킬 이펙트 FX ───────────────────────────────
+  dangerZonesFx.forEach(d=>{
+    const sx=d.x-camX, sy=d.y-camY;
+    const t=d.life/(d.type==='thunder'?25:18);
+    ctx.save();
+    ctx.globalAlpha=t*0.35;
+    ctx.fillStyle=d.col;
+    ctx.beginPath(); ctx.arc(sx,sy,d.r,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=t*0.8;
+    ctx.strokeStyle=d.col; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(sx,sy,d.r,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  });
+
+  // ── 아이템 렌더 ─────────────────────────────────
+  items.forEach(it=>{
+    const ddx=it.x-player.x, ddy=it.y-player.y;
+    if(ddx*ddx+ddy*ddy>SIGHT_R*SIGHT_R*1.2) return;
+    const sx=it.x-camX, sy=it.y-camY;
+    const pulse=0.85+0.15*Math.sin(it.pulse*0.1);
+    ctx.save();
+    ctx.globalAlpha=0.9;
+    ctx.shadowColor=ITEM_COL[it.type]; ctx.shadowBlur=14;
+    ctx.fillStyle=ITEM_COL[it.type];
+    ctx.beginPath(); ctx.arc(sx,sy,10*pulse,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.font='12px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(ITEM_EMOJI[it.type],sx,sy);
+    ctx.restore();
+  });
+
   // ── Fog of War (별도 캔버스 → 합성) ────────────────
   // fogCv 에 fog를 그린 뒤 main canvas 위에 올림
   // → destination-out 이 main canvas 픽셀을 건드리지 않음
@@ -885,6 +1162,17 @@ function draw(){
     ctx.fillStyle='#44aaff22';
     ctx.beginPath(); ctx.ellipse(sx,sy+14,11,5,0,0,Math.PI*2); ctx.fill();
 
+    // 방패 링
+    if(shieldActive>0){
+      const sp=0.8+0.2*Math.sin(tick*0.2);
+      ctx.globalAlpha=0.5*sp;
+      ctx.strokeStyle='#88eeff'; ctx.lineWidth=4;
+      ctx.beginPath(); ctx.arc(sx,sy,22,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha=0.12*sp;
+      ctx.fillStyle='#88eeff';
+      ctx.beginPath(); ctx.arc(sx,sy,22,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=!player.alive?0.3:blinking?0.5:1;
+    }
     // 글로우 + 몸통
     ctx.shadowColor='#44aaff'; ctx.shadowBlur=20;
     ctx.fillStyle='#44aaff';
