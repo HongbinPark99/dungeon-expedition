@@ -433,6 +433,10 @@ function initGame(){
   };
   camX = player.x - canvas.width/2;
   camY = player.y - canvas.height/2;
+  // 캐시 초기화
+  _tilesDirty=true; _tileCanvas=null; _tileCtx=null;
+  _mmDirty=true; _mmCanvas=null; _mmCtx2=null;
+  window._fog=null; window._fogC=null;
 
   // 초기 몬스터 배치 (보스 방 제외)
   for(let i=0;i<28;i++) spawnMonster();
@@ -890,47 +894,38 @@ function update(){
   camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
   if(screenShake>0) screenShake--;
 
-  // ── HUD ──────────────────────────────────────────
-  const pct=Math.max(0,player.hp/player.maxHp*100);
-  document.getElementById('hf0').style.width=pct+'%';
-  document.getElementById('hn0').textContent=Math.max(0,player.hp)+' / '+player.maxHp;
-  document.getElementById('s-kills').textContent=kills;
-
-  // 스킬 쿨다운 표시
-  const skillDefs=[
-    {id:'sk0',cd:player.attackCd,max:P_CD},
-    {id:'sk1',cd:skillCd.bomb,max:CD_BOMB},
-    {id:'sk2',cd:skillCd.shield,max:CD_SHIELD},
-    {id:'sk3',cd:skillCd.thunder,max:CD_THUNDER},
-  ];
-  skillDefs.forEach(s=>{
-    const el=document.getElementById(s.id);
-    const cdEl=document.getElementById(s.id+'cd');
-    if(!el||!cdEl) return;
-    if(s.cd<=0){
-      el.className='skill-slot ready';
-      cdEl.textContent='준비';
-    } else {
-      el.className='skill-slot';
-      cdEl.textContent=`${(s.cd/60).toFixed(1)}s`;
-    }
-  });
-  // 방패 활성 표시
-  const sk2=document.getElementById('sk2');
-  if(sk2&&shieldActive>0) sk2.className='skill-slot active';
-
-  // 아이템 목록
-  const itemCounts={};
-  items.forEach(it=>{ itemCounts[it.type]=(itemCounts[it.type]||0)+1; });
-  const itEl=document.getElementById('item-list');
-  if(itEl){
-    const entries=Object.entries(itemCounts);
-    itEl.innerHTML=entries.length===0
-      ? '<div class="it-row" style="color:#556">없음</div>'
-      : entries.map(([t,n])=>`<div class="it-row">${ITEM_EMOJI[t]} x${n}</div>`).join('');
-  }
-
+  // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
   const boss=monsters.find(m=>m.type==='boss'&&m.alive);
+  if(tick%6===0){
+    const pct=Math.max(0,player.hp/player.maxHp*100);
+    document.getElementById('hf0').style.width=pct+'%';
+    document.getElementById('hn0').textContent=Math.max(0,player.hp)+' / '+player.maxHp;
+    document.getElementById('s-kills').textContent=kills;
+    const skillDefs=[
+      {id:'sk0',cd:player.attackCd,max:P_CD},
+      {id:'sk1',cd:skillCd.bomb,max:CD_BOMB},
+      {id:'sk2',cd:skillCd.shield,max:CD_SHIELD},
+      {id:'sk3',cd:skillCd.thunder,max:CD_THUNDER},
+    ];
+    skillDefs.forEach(s=>{
+      const el=document.getElementById(s.id);
+      const cdEl=document.getElementById(s.id+'cd');
+      if(!el||!cdEl) return;
+      el.className=s.cd<=0?'skill-slot ready':'skill-slot';
+      cdEl.textContent=s.cd<=0?'준비':`${(s.cd/60).toFixed(1)}s`;
+    });
+    const sk2=document.getElementById('sk2');
+    if(sk2&&shieldActive>0) sk2.className='skill-slot active';
+    const itemCounts={};
+    items.forEach(it=>{ itemCounts[it.type]=(itemCounts[it.type]||0)+1; });
+    const itEl=document.getElementById('item-list');
+    if(itEl){
+      const entries=Object.entries(itemCounts);
+      itEl.innerHTML=entries.length===0
+        ?'<div class="it-row" style="color:#556">없음</div>'
+        :entries.map(([t,n])=>`<div class="it-row">${ITEM_EMOJI[t]} x${n}</div>`).join('');
+    }
+  }
   if(boss){
     document.getElementById('boss-hp-fill').style.width=(boss.hp/boss.maxHp*100)+'%';
     document.getElementById('boss-title').textContent=
@@ -957,13 +952,66 @@ function updateFog(){
 // ═══════════════════════════════════════════════════════
 //  렌더
 // ═══════════════════════════════════════════════════════
-// 미리 캔버스에 타일 팔레트 생성
-const floorColor  ='#111228';
-const wallColor   ='#1e2040';
-const wallTop     ='#252848';
-const bossFloor   ='#1e0808';
-const dimFloor    ='#0a0a18';
-const dimWall     ='#0d0e1e';
+// 타일 색상
+const floorColor='#111228', wallColor='#1e2040', wallTop='#252848';
+const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
+
+// ── 타일맵 오프스크린 캐시 ──────────────────────────
+// 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
+// 화면에 보이는 영역만 drawImage로 잘라서 그림
+// explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
+let _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
+let _mmCanvas=null, _mmCtx2=null;
+let _exploredVersion=0, _lastExploredVersion=-1;
+
+function _rebuildTileCache(){
+  if(!_tileCanvas){
+    _tileCanvas=document.createElement('canvas');
+    _tileCanvas.width=MAP_W; _tileCanvas.height=MAP_H;
+    _tileCtx=_tileCanvas.getContext('2d');
+  }
+  const tc=_tileCtx, ts=TILE;
+  tc.fillStyle='#050810'; tc.fillRect(0,0,MAP_W,MAP_H);
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      const idx=r*COLS+c;
+      if(!explored[idx]) continue;
+      const wx=c*ts, wy=r*ts;
+      const t=tiles[idx];
+      const inBoss=bossArena&&wx>=bossArena.x-ts&&wx<bossArena.x+bossArena.w+ts
+                &&wy>=bossArena.y-ts&&wy<bossArena.y+bossArena.h+ts;
+      if(t===1){
+        tc.fillStyle=wallColor;  tc.fillRect(wx,wy,ts,ts);
+        tc.fillStyle=wallTop;    tc.fillRect(wx+2,wy+2,ts-4,ts-4);
+        tc.fillStyle='#2a305a';  tc.fillRect(wx+2,wy+2,ts-4,3);
+        tc.fillStyle='#2a305a';  tc.fillRect(wx+2,wy+2,3,ts-4);
+      } else {
+        tc.fillStyle=inBoss?bossFloor:floorColor; tc.fillRect(wx,wy,ts,ts);
+        tc.strokeStyle=inBoss?'#2a1010':'#151530';
+        tc.lineWidth=.5; tc.strokeRect(wx,wy,ts,ts);
+      }
+    }
+  }
+  _tilesDirty=false;
+}
+
+// updateFog 호출 후 dirty 마크
+const _origUpdateFog=()=>{
+  if(!player.alive) return;
+  const r=Math.ceil(SIGHT_R/TILE)+1;
+  const cx=player.x/TILE|0, cy=player.y/TILE|0;
+  let changed=false;
+  for(let dy=-r;dy<=r;dy++){
+    for(let dx=-r;dx<=r;dx++){
+      if(dx*dx*TILE*TILE+dy*dy*TILE*TILE>(SIGHT_R+TILE)*(SIGHT_R+TILE)) continue;
+      const c=cx+dx, rr=cy+dy;
+      if(c>=0&&c<COLS&&rr>=0&&rr<ROWS&&!explored[rr*COLS+c]){
+        explored[rr*COLS+c]=1; changed=true;
+      }
+    }
+  }
+  if(changed) _tilesDirty=true;
+};
 
 function draw(){
   const W=canvas.width, H=canvas.height;
@@ -975,44 +1023,14 @@ function draw(){
   ctx.clearRect(-10,-10,W+20,H+20);
   ctx.fillStyle='#050810'; ctx.fillRect(-10,-10,W+20,H+20);
 
-  // ── 타일 ──────────────────────────────────────────
-  const ts=TILE;
-  const c0=Math.max(0,(camX/ts)|0)-1;
-  const c1=Math.min(COLS,((camX+W)/ts|0)+2);
-  const r0=Math.max(0,(camY/ts)|0)-1;
-  const r1=Math.min(ROWS,((camY+H)/ts|0)+2);
-
+  // ── 타일 (오프스크린 캐시 → drawImage 1회) ────────
   const px=player.x, py=player.y, sr2=SIGHT_R*SIGHT_R;
-
-  for(let r=r0;r<r1;r++){
-    for(let c=c0;c<c1;c++){
-      const idx=r*COLS+c;
-      const exp=explored[idx];
-      if(!exp) continue;
-      const wx=c*ts, wy=r*ts;
-      const ddx=wx+ts/2-px, ddy=wy+ts/2-py;
-      const inSight=ddx*ddx+ddy*ddy<sr2*1.05;
-      const sx=wx-camX|0, sy=wy-camY|0;
-      const t=tiles[idx];
-
-      if(inSight){
-        const inBoss=wx>=bossArena.x-ts&&wx<bossArena.x+bossArena.w+ts
-                  &&wy>=bossArena.y-ts&&wy<bossArena.y+bossArena.h+ts;
-        if(t===1){
-          ctx.fillStyle=wallColor; ctx.fillRect(sx,sy,ts,ts);
-          ctx.fillStyle=wallTop;   ctx.fillRect(sx+2,sy+2,ts-4,ts-4);
-          ctx.fillStyle='#2a305a'; ctx.fillRect(sx+2,sy+2,ts-4,3);
-          ctx.fillStyle='#2a305a'; ctx.fillRect(sx+2,sy+2,3,ts-4);
-        } else {
-          ctx.fillStyle=inBoss?bossFloor:floorColor; ctx.fillRect(sx,sy,ts,ts);
-          ctx.strokeStyle=inBoss?'#2a1010':'#151530';
-          ctx.lineWidth=.5; ctx.strokeRect(sx,sy,ts,ts);
-        }
-      } else {
-        ctx.fillStyle=t===1?dimWall:dimFloor; ctx.fillRect(sx,sy,ts,ts);
-      }
-    }
+  if(_tilesDirty) _rebuildTileCache();
+  // 탐험된 타일 전체를 한 번에
+  if(_tileCanvas){
+    ctx.drawImage(_tileCanvas, camX|0, camY|0, W, H, 0, 0, W, H);
   }
+  // 미탐험 영역은 fog가 덮으므로 별도 처리 불필요
 
   // ── 보스 방 테두리 ────────────────────────────────
   {
@@ -1320,33 +1338,25 @@ function draw(){
     ctx.restore();
   });
 
-  // ── Fog of War — 오프스크린 캔버스에 fog 완성 후 drawImage ──
-  // destination-out 을 오프스크린에서만 사용 → 메인 캔버스 픽셀 안 건드림
-  // 플레이어는 아래쪽에서 메인 캔버스에 직접 그려 항상 보임
+  // ── Fog of War — 오프스크린 → drawImage ─────────────
   {
-    const psx=player.x-camX, psy=player.y-camY;
-    // 오프스크린 캔버스 준비 (전역 재사용)
-    if(!window._fog || window._fog.width!==W || window._fog.height!==H){
-      window._fog = document.createElement('canvas');
+    const psx=player.x-camX|0, psy=player.y-camY|0;
+    if(!window._fog||window._fog.width!==W||window._fog.height!==H){
+      window._fog=document.createElement('canvas');
       window._fog.width=W; window._fog.height=H;
-      window._fogC = window._fog.getContext('2d');
+      window._fogC=window._fog.getContext('2d');
     }
     const fc2=window._fogC;
-    // 매 프레임: 오프스크린 초기화
     fc2.clearRect(0,0,W,H);
-    // 전체를 어둡게
-    fc2.fillStyle='rgba(5,8,16,0.93)';
-    fc2.fillRect(0,0,W,H);
-    // 시야 원만 destination-out으로 투명하게
+    fc2.fillStyle='rgba(5,8,16,0.93)'; fc2.fillRect(0,0,W,H);
     fc2.globalCompositeOperation='destination-out';
     const fg=fc2.createRadialGradient(psx,psy,SIGHT_R*0.35,psx,psy,SIGHT_R);
-    fg.addColorStop(0,  'rgba(0,0,0,1)');
+    fg.addColorStop(0,'rgba(0,0,0,1)');
     fg.addColorStop(0.6,'rgba(0,0,0,0.92)');
-    fg.addColorStop(1,  'rgba(0,0,0,0)');
+    fg.addColorStop(1,'rgba(0,0,0,0)');
     fc2.fillStyle=fg;
     fc2.beginPath(); fc2.arc(psx,psy,SIGHT_R,0,Math.PI*2); fc2.fill();
-    fc2.globalCompositeOperation='source-over'; // 오프스크린 원복
-    // 완성된 fog 레이어를 메인 캔버스에 올림
+    fc2.globalCompositeOperation='source-over';
     ctx.drawImage(window._fog,0,0);
   }
 
@@ -1424,18 +1434,31 @@ function draw(){
 //  drawSprite(ctx, pixels, x, y, scale, flipX)
 //  pixels: [row][col] = '#rrggbb' | 'transparent'
 // ═══════════════════════════════════════════════════════
-function drawSprite(c, pixels, cx, cy, scale, flipX=false){
+// 스프라이트 캐시: key=`type_scale_flip` → ImageBitmap (또는 캔버스)
+const _spriteCache={};
+
+function _renderToCache(pixels, scale, flipX){
   const rows=pixels.length, cols=pixels[0].length;
-  const ox=cx - cols*scale/2, oy=cy - rows*scale/2;
+  const oc=document.createElement('canvas');
+  oc.width=cols*scale; oc.height=rows*scale;
+  const oc2=oc.getContext('2d');
   for(let r=0;r<rows;r++){
     for(let col=0;col<cols;col++){
       const pix=pixels[r][col];
       if(!pix||pix==='.'||pix==='x') continue;
-      const dc = flipX ? cols-1-col : col;
-      c.fillStyle=pix;
-      c.fillRect(ox+dc*scale|0, oy+r*scale|0, scale, scale);
+      const dc=flipX?cols-1-col:col;
+      oc2.fillStyle=pix;
+      oc2.fillRect(dc*scale,r*scale,scale,scale);
     }
   }
+  return oc; // HTMLCanvasElement — drawImage 가능
+}
+
+function drawSprite(c, pixels, cx, cy, scale, flipX=false){
+  const key=pixels._cacheKey+(flipX?'_f':'_n')+scale;
+  if(!_spriteCache[key]) _spriteCache[key]=_renderToCache(pixels,scale,flipX);
+  const img=_spriteCache[key];
+  c.drawImage(img, cx-img.width/2|0, cy-img.height/2|0);
 }
 
 // ── 용사 (16×20) ──────────────────────────────────────
@@ -1624,6 +1647,15 @@ const SP_MAP = {
   hunter: SP_HUNTER,
   boss:   SP_BOSS,
 };
+// 캐시 키 부여
+SP_PLAYER._cacheKey='player';
+SP_GOBLIN._cacheKey='goblin';
+SP_ORC._cacheKey='orc';
+SP_SHADE._cacheKey='shade';
+SP_ARCHER._cacheKey='archer';
+SP_MAGE._cacheKey='mage';
+SP_HUNTER._cacheKey='hunter';
+SP_BOSS._cacheKey='boss';
 
 function drawMonsterSprite(c, m, sx, sy){
   const sp = SP_MAP[m.type];
@@ -1655,39 +1687,42 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive){
 function drawMinimap(){
   const mW=mmCv.width, mH=mmCv.height;
   const scX=mW/MAP_W, scY=mH/MAP_H;
-  mmCtx.fillStyle='#05080f'; mmCtx.fillRect(0,0,mW,mH);
 
-  for(let r=0;r<ROWS;r++){
-    for(let c=0;c<COLS;c++){
-      if(!explored[r*COLS+c]) continue;
-      mmCtx.fillStyle=tiles[r*COLS+c]===1?'#2a2d50':'#191c36';
-      mmCtx.fillRect(c*TILE*scX|0,r*TILE*scY|0,Math.ceil(TILE*scX+.5),Math.ceil(TILE*scY+.5));
+  // 탐험 변경 시에만 오프스크린 재렌더
+  if(_tilesDirty||!_mmCanvas){
+    if(!_mmCanvas){
+      _mmCanvas=document.createElement('canvas');
+      _mmCanvas.width=mW; _mmCanvas.height=mH;
+      _mmCtx2=_mmCanvas.getContext('2d');
+    }
+    _mmCtx2.fillStyle='#05080f'; _mmCtx2.fillRect(0,0,mW,mH);
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        if(!explored[r*COLS+c]) continue;
+        _mmCtx2.fillStyle=tiles[r*COLS+c]===1?'#2a2d50':'#191c36';
+        _mmCtx2.fillRect(c*TILE*scX|0,r*TILE*scY|0,Math.ceil(TILE*scX+.5),Math.ceil(TILE*scY+.5));
+      }
     }
   }
+  mmCtx.clearRect(0,0,mW,mH);
+  if(_mmCanvas) mmCtx.drawImage(_mmCanvas,0,0);
 
-  // 보스 방
+  // 보스 방 펄스
   const bExp=explored[Math.floor(bossArena.y/TILE)*COLS+Math.floor(bossArena.x/TILE)];
   if(bExp){
     const pulse=.5+.5*Math.sin(tick*.04);
-    mmCtx.strokeStyle=`rgba(255,68,0,${pulse})`;
-    mmCtx.lineWidth=1.5;
+    mmCtx.strokeStyle=`rgba(255,68,0,${pulse})`; mmCtx.lineWidth=1.5;
     mmCtx.strokeRect(bossArena.x*scX,bossArena.y*scY,bossArena.w*scX,bossArena.h*scY);
   }
-
-  // 플레이어
+  // 플레이어 점
   mmCtx.fillStyle='#fff';
-  mmCtx.beginPath();
-  mmCtx.arc(player.x*scX,player.y*scY,3.5,0,Math.PI*2);
-  mmCtx.fill();
-
-  // 뷰포트 박스
+  mmCtx.beginPath(); mmCtx.arc(player.x*scX,player.y*scY,3.5,0,Math.PI*2); mmCtx.fill();
+  // 뷰포트
   mmCtx.strokeStyle='#ffffff22'; mmCtx.lineWidth=1;
   mmCtx.strokeRect(camX*scX,camY*scY,canvas.width*scX,canvas.height*scY);
 }
 
-// ═══════════════════════════════════════════════════════
-//  로그 / 알림 / 엔딩
-// ═══════════════════════════════════════════════════════
+
 function addLog(msg,type=''){
   logEntries.unshift({msg,type});
   if(logEntries.length>20) logEntries.pop();
@@ -1724,13 +1759,27 @@ function showEnding(won){
 //  메인 루프
 // ═══════════════════════════════════════════════════════
 let rafId=null;
-let lastT=0;
+let lastT=0, accumT=0;
+const FIXED_DT=1000/60; // 고정 60fps 업데이트
+
 function loop(t=0){
   rafId=requestAnimationFrame(loop);
-  const dt=t-lastT; lastT=t;
-  // 프레임 스킵 방지 (탭 비활성 후 복귀 시)
-  if(dt>200) return;
-  update();
+  const dt=Math.min(t-lastT, 100); // 최대 100ms (탭 복귀 시 스파이크 방지)
+  lastT=t;
+
+  if(multiMode){
+    draw();
+    return;
+  }
+
+  // 고정 타임스텝 누적
+  accumT+=dt;
+  let steps=0;
+  while(accumT>=FIXED_DT && steps<3){ // 최대 3스텝 (렉 스파이크 방지)
+    update();
+    accumT-=FIXED_DT;
+    steps++;
+  }
   draw();
 }
 
