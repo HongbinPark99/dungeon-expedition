@@ -961,7 +961,7 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
 let _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
-let _mmCanvas=null, _mmCtx2=null;
+let _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
 let _exploredVersion=0, _lastExploredVersion=-1;
 
 function _rebuildTileCache(){
