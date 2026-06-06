@@ -44,7 +44,7 @@ body{
 
 /* ── 게임 ── */
 #game{display:none;position:fixed;inset:0;}
-canvas{display:block;}
+canvas{display:block;cursor:none;}
 
 /* ── HUD ── */
 #hud{
@@ -181,10 +181,10 @@ canvas{display:block;}
   <h1>⚔ 던전 원정대</h1>
   <div class="lobby-sub">어둠의 던전을 탐험하라</div>
   <div class="key-box">
-    <b>↑↓←→</b> 이동 &nbsp;|&nbsp; <b>SPACE</b> 총알 발사<br>
-    <b>Z</b> 폭탄 투척 &nbsp;|&nbsp; <b>X</b> 방패막 &nbsp;|&nbsp; <b>C</b> 번개 범위공격<br>
-    안개 속 보스 방 탐험 · 아이템 드랍 획득<br>
-    몬스터 패턴을 읽고 피하며 싸워라!
+    <b>↑↓←→ / WASD</b> 이동<br>
+    <b>🖱 마우스</b> 조준 &nbsp;|&nbsp; <b>좌클릭 / SPACE</b> 발사<br>
+    <b>우클릭 / Z</b> 폭탄 &nbsp;|&nbsp; <b>X</b> 방패막 &nbsp;|&nbsp; <b>C</b> 번개<br>
+    안개 속 보스 방을 탐험해 찾아라!
   </div>
   <!-- 1인 플레이 -->
   <button id="start-btn">혼자 탐험하기</button>
@@ -224,7 +224,7 @@ canvas{display:block;}
       스테이지: <span id="s-stage">탐험중</span>
     </div>
   </div>
-  <div id="hint">↑↓←→ 이동 | SPACE 공격<br>Z 폭탄 | X 방패막 | C 범위공격<br>보스 방을 찾아라!</div>
+  <div id="hint">↑↓←→ / WASD 이동<br>🖱 마우스 조준 | 좌클릭 / SPACE 공격<br>우클릭 Z 폭탄 | X 방패막 | C 번개</div>
 
   <div id="skill-bar">
     <div class="skill-slot" id="sk0"><span class="sk-key">SPACE</span>🔫<span class="sk-cd" id="sk0cd"></span></div>
@@ -387,6 +387,31 @@ let spawnTimer=0;
 let logEntries=[];
 
 const keys={};
+// ── 마우스 조준 ───────────────────────────────────────
+const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
+let mouseAttacking=false; // 마우스 버튼 홀드 시 연사
+
+canvas.addEventListener('mousemove',e=>{
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=e.clientX-rect.left;
+  mouse.y=e.clientY-rect.top;
+  // 마우스 방향으로 facing 즉시 업데이트
+  if(player&&player.alive&&gameRunning){
+    player.facing=Math.atan2(
+      (mouse.y+camY)-player.y,
+      (mouse.x+camX)-player.x
+    );
+  }
+});
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button===0){ mouseAttacking=true; doAttack(); }
+});
+canvas.addEventListener('mouseup',e=>{
+  if(e.button===0) mouseAttacking=false;
+});
+canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); doSkillBomb(); });
+
 document.addEventListener('keydown',e=>{
   keys[e.key]=true;
   if(e.key===' '){e.preventDefault(); doAttack();}
@@ -628,6 +653,16 @@ function update(){
     if(player.iframes>0) player.iframes--;
     if(player.attackCd>0) player.attackCd--;
 
+    // 마우스 방향으로 facing 매 틱 갱신 (이동 없어도 조준 유지)
+    if(gameRunning){
+      player.facing=Math.atan2(
+        (mouse.y+camY)-player.y,
+        (mouse.x+camX)-player.x
+      );
+    }
+    // 마우스 홀드 연사
+    if(mouseAttacking) doAttack();
+
     let dx=0,dy=0;
     if(keys['ArrowUp']   ||keys['w']||keys['W']) dy-=1;
     if(keys['ArrowDown'] ||keys['s']||keys['S']) dy+=1;
@@ -635,7 +670,7 @@ function update(){
     if(keys['ArrowRight']||keys['d']||keys['D']) dx+=1;
     if(dx||dy){
       const len=Math.hypot(dx,dy);
-      player.facing = Math.atan2(dy,dx);
+      // facing은 마우스가 움직였을 때 이미 업데이트됨 — 이동방향으론 덮지 않음
       const spd2 = P_SPEED*(player.speedBoost>0?1.7:1);
       const nx=player.x+(dx/len)*spd2;
       const ny=player.y+(dy/len)*spd2;
@@ -1370,6 +1405,49 @@ function draw(){
     ctx.beginPath(); ctx.arc(p.x-camX,p.y-camY,p.r,0,Math.PI*2); ctx.fill();
     ctx.restore();
   });
+
+  // ── 조준선 ───────────────────────────────────────
+  if(player.alive&&gameRunning){
+    const psx=player.x-camX, psy=player.y-camY;
+    const ang=player.facing||0;
+    const atkReady=player.attackCd<=0;
+
+    ctx.save();
+    // 방향 점선
+    ctx.setLineDash([6,5]);
+    ctx.strokeStyle=atkReady?'rgba(100,200,255,0.55)':'rgba(100,200,255,0.2)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(psx+Math.cos(ang)*18, psy+Math.sin(ang)*18);
+    ctx.lineTo(psx+Math.cos(ang)*P_RANGE, psy+Math.sin(ang)*P_RANGE);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 크로스헤어 (마우스 위치)
+    const msx=mouse.x, msy=mouse.y;
+    const cr=10; // 크로스헤어 반지름
+    ctx.strokeStyle=atkReady?'rgba(100,220,255,0.85)':'rgba(100,180,255,0.4)';
+    ctx.lineWidth=1.5;
+    // 원
+    ctx.beginPath(); ctx.arc(msx,msy,cr,0,Math.PI*2); ctx.stroke();
+    // 십자선
+    ctx.beginPath();
+    ctx.moveTo(msx-cr-4,msy); ctx.lineTo(msx-cr+3,msy);
+    ctx.moveTo(msx+cr-3,msy); ctx.lineTo(msx+cr+4,msy);
+    ctx.moveTo(msx,msy-cr-4); ctx.lineTo(msx,msy-cr+3);
+    ctx.moveTo(msx,msy+cr-3); ctx.lineTo(msx,msy+cr+4);
+    ctx.stroke();
+    // 쿨다운 호 (공격 준비 중)
+    if(!atkReady){
+      const cdRatio=1-player.attackCd/P_CD;
+      ctx.strokeStyle='rgba(100,220,255,0.7)';
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.arc(msx,msy,cr,-Math.PI/2,-Math.PI/2+Math.PI*2*cdRatio);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   // ── 플레이어 (fog 위 → 항상 보임) ────────────────
   {
