@@ -247,12 +247,43 @@ canvas{display:block;cursor:none;}
 }
 .m-skill-btn.m-ready{ border-color:#44aaff; box-shadow:0 0 8px #44aaff55; }
 
-/* 조준 오버레이 (우측 절반) */
-#aim-zone{
-  position:absolute;top:0;right:0;
-  width:55%;height:100%;
+/* 오른쪽 조준 조이스틱 */
+#aim-joystick-zone{
+  position:absolute;bottom:20px;right:170px;
+  width:140px;height:140px;
   pointer-events:all;touch-action:none;
-  /* background:rgba(255,0,0,0.05); /* 디버그용 */
+}
+#aim-joystick-base{
+  position:absolute;inset:0;
+  border-radius:50%;
+  background:rgba(255,100,100,0.08);
+  border:2px solid rgba(255,150,150,0.2);
+  backdrop-filter:blur(2px);
+}
+#aim-joystick-stick{
+  position:absolute;
+  width:52px;height:52px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,rgba(255,200,200,0.5),rgba(255,100,100,0.35));
+  border:2px solid rgba(255,130,100,0.7);
+  box-shadow:0 0 14px rgba(255,80,80,0.4);
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  transition:none;
+  pointer-events:none;
+}
+/* 조준 레이블 */
+#aim-joystick-zone::after{
+  content:'조준';
+  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+  font-size:.55rem;color:rgba(255,160,160,0.6);
+  pointer-events:none;
+}
+#joystick-zone::after{
+  content:'이동';
+  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+  font-size:.55rem;color:rgba(160,200,255,0.6);
+  pointer-events:none;
 }
 
 @media (pointer:coarse) and (max-width:900px){
@@ -262,7 +293,7 @@ canvas{display:block;cursor:none;}
   .p-card{ min-width:100px; padding:5px 8px; }
   #hint{ display:none; } /* 키보드 힌트 숨김 */
   #item-tray{ top:auto;bottom:210px;left:8px; }
-  #skill-bar{ bottom:210px; }
+  #skill-bar{ display:none; } /* 모바일 전용 버튼으로 대체 */
   #weapon-hud{ bottom:210px; }
   #mm-wrap{ bottom:210px;right:8px; }
   #log{ bottom:210px; }
@@ -363,8 +394,11 @@ canvas{display:block;cursor:none;}
     <div id="joystick-stick"></div>
   </div>
 
-  <!-- 조준 영역 (우측) -->
-  <div id="aim-zone"></div>
+  <!-- 오른쪽 조준 조이스틱 -->
+  <div id="aim-joystick-zone">
+    <div id="aim-joystick-base"></div>
+    <div id="aim-joystick-stick"></div>
+  </div>
 
   <!-- 액션 버튼들 -->
   <div id="action-buttons">
@@ -400,7 +434,7 @@ const TILE = 48;
 let stage = 1;
 let totalKills = 0; // 전체 누적 킬
 const SIGHT_R = 480;
-const P_SPEED = 3.0;
+const P_SPEED = 2.0;
 const P_HP    = 120;
 const P_ATK   = 32;
 const P_RANGE = 68;
@@ -769,8 +803,8 @@ function initMobileControls(){
       if(t.identifier !== joyState.id) continue;
       const r = jZone.getBoundingClientRect();
       joyMove(t.clientX, t.clientY, r.left + r.width/2, r.top + r.height/2);
-      // 이동 방향으로 facing 업데이트
-      if(player && (joyState.dx||joyState.dy))
+      // 조준 조이스틱이 없을 때만 이동방향으로 facing 업데이트
+      if(player && (joyState.dx||joyState.dy) && !(typeof aimJoyState!=='undefined'&&aimJoyState.active))
         player.facing = Math.atan2(joyState.dy, joyState.dx);
     }
   },{passive:false});
@@ -787,45 +821,63 @@ function initMobileControls(){
   jZone.addEventListener('touchend',   joyEnd, {passive:false});
   jZone.addEventListener('touchcancel',joyEnd, {passive:false});
 
-  // ── 조준 (우측 드래그) ──────────────────────────────
-  const aimZone = document.getElementById('aim-zone');
-  aimZone.addEventListener('touchstart', e=>{
+  // ── 오른쪽 조준 조이스틱 ──────────────────────────────
+  const aimJZone  = document.getElementById('aim-joystick-zone');
+  const aimStick  = document.getElementById('aim-joystick-stick');
+  const AIM_BASE_R = 65;
+  const aimJoyState = {dx:0, dy:0, active:false, id:-1};
+
+  function aimJoyMove(cx, cy, ox, oy){
+    let dx = cx-ox, dy = cy-oy;
+    const dist = Math.hypot(dx, dy);
+    if(dist > AIM_BASE_R){ dx *= AIM_BASE_R/dist; dy *= AIM_BASE_R/dist; }
+    aimStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    aimJoyState.dx = dx / AIM_BASE_R;
+    aimJoyState.dy = dy / AIM_BASE_R;
+    // 조이스틱 방향으로 즉시 조준
+    if(player && player.alive && (dx||dy)){
+      player.facing = Math.atan2(dy, dx);
+      // 크로스헤어 위치도 업데이트 (플레이어 기준 방향)
+      if(gameRunning){
+        const psx = player.x - camX;
+        const psy = player.y - camY;
+        mouse.x = psx + Math.cos(player.facing) * 120;
+        mouse.y = psy + Math.sin(player.facing) * 120;
+      }
+    }
+  }
+
+  aimJZone.addEventListener('touchstart', e=>{
     e.preventDefault();
     const t = e.changedTouches[0];
-    aimState.id = t.identifier;
-    aimState.active = true;
-    aimState.startX = t.clientX;
-    aimState.startY = t.clientY;
-    aimState.x = t.clientX;
-    aimState.y = t.clientY;
+    const r = aimJZone.getBoundingClientRect();
+    aimJoyState.id = t.identifier;
+    aimJoyState.active = true;
+    aimJoyMove(t.clientX, t.clientY, r.left+r.width/2, r.top+r.height/2);
   },{passive:false});
 
-  aimZone.addEventListener('touchmove', e=>{
+  aimJZone.addEventListener('touchmove', e=>{
     e.preventDefault();
     for(const t of e.changedTouches){
-      if(t.identifier !== aimState.id) continue;
-      aimState.x = t.clientX;
-      aimState.y = t.clientY;
-      // 드래그 방향으로 조준
-      if(player && player.alive){
-        const ddx = t.clientX - aimState.startX;
-        const ddy = t.clientY - aimState.startY;
-        if(Math.hypot(ddx, ddy) > 8)
-          player.facing = Math.atan2(ddy, ddx);
-        // 크로스헤어도 실제 화면 위치로
-        mouse.x = t.clientX;
-        mouse.y = t.clientY;
-      }
+      if(t.identifier !== aimJoyState.id) continue;
+      const r = aimJZone.getBoundingClientRect();
+      aimJoyMove(t.clientX, t.clientY, r.left+r.width/2, r.top+r.height/2);
     }
   },{passive:false});
 
-  function aimEnd(e){
+  function aimJoyEnd(e){
     e.preventDefault();
-    for(const t of e.changedTouches)
-      if(t.identifier===aimState.id){ aimState.active=false; aimState.id=-1; }
+    for(const t of e.changedTouches){
+      if(t.identifier !== aimJoyState.id) continue;
+      aimJoyState.active = false;
+      aimJoyState.id = -1;
+      aimJoyState.dx = 0;
+      aimJoyState.dy = 0;
+      aimStick.style.transform = 'translate(-50%,-50%)';
+    }
   }
-  aimZone.addEventListener('touchend',   aimEnd, {passive:false});
-  aimZone.addEventListener('touchcancel',aimEnd, {passive:false});
+  aimJZone.addEventListener('touchend',   aimJoyEnd, {passive:false});
+  aimJZone.addEventListener('touchcancel',aimJoyEnd, {passive:false});
 
   // ── 공격 버튼 ────────────────────────────────────────
   const btnAtk = document.getElementById('btn-attack');
@@ -836,7 +888,16 @@ function initMobileControls(){
   // 홀드 연사
   let atkInterval = null;
   btnAtk.addEventListener('touchstart', e=>{
-    atkInterval = setInterval(()=>{ if(gameRunning&&player&&player.alive) doAttack(); }, 80);
+    e.preventDefault();
+    atkInterval = setInterval(()=>{
+      if(gameRunning&&player&&player.alive){
+        // 조준 조이스틱 방향이 있으면 그쪽으로 발사
+        if(typeof aimJoyState!=='undefined'&&aimJoyState.active&&(aimJoyState.dx||aimJoyState.dy)){
+          player.facing = Math.atan2(aimJoyState.dy, aimJoyState.dx);
+        }
+        doAttack();
+      }
+    }, 90);
   },{passive:false});
   btnAtk.addEventListener('touchend',   ()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
   btnAtk.addEventListener('touchcancel',()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
@@ -1308,8 +1369,11 @@ function update(){
       const mi=getMobileInput();
       if(mi.up) dy-=1; if(mi.down) dy+=1;
       if(mi.left) dx-=1; if(mi.right) dx+=1;
-      // 연속값으로 더 부드럽게
       if(!dx&&!dy){ dx=joyState.dx; dy=joyState.dy; }
+    }
+    // 조준 조이스틱 facing 실시간 반영
+    if(mobileActive && typeof aimJoyState!=='undefined' && aimJoyState.active){
+      player.facing = Math.atan2(aimJoyState.dy, aimJoyState.dx);
     }
     if(dx||dy){
       const len=Math.hypot(dx,dy);
