@@ -225,7 +225,8 @@ canvas{display:block;cursor:none;}
       누적: <span id="s-total">0</span>
     </div>
   </div>
-  <div id="hint">↑↓←→ / WASD 이동<br>🖱 마우스 조준 | 좌클릭 / SPACE 공격<br>우클릭 Z 폭탄 | X 방패막 | C 번개</div>
+  <div id="hint">↑↓←→ 이동 | 마우스 조준<br>좌클릭/SPACE 공격 | 우클릭/Z 폭탄<br>X 방패 | C 번개 | 무기 드랍 주워서 교체!</div>
+  <div id="weapon-hud" style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;padding:6px 18px;font-size:.78rem;color:#ccd;z-index:10;backdrop-filter:blur(6px);text-align:center;pointer-events:none;"><span id="weapon-emoji">🗡</span> <span id="weapon-name">기본 검</span> <span style="color:#667;font-size:.65rem;margin-left:8px" id="weapon-desc">기본 근접 공격</span></div>
 
   <div id="skill-bar">
     <div class="skill-slot" id="sk0"><span class="sk-key">SPACE</span>🔫<span class="sk-cd" id="sk0cd"></span></div>
@@ -283,6 +284,21 @@ const IFRAMES = 48;
 const BULLET_SPEED = 10;
 const BULLET_LEN   = 24;
 const BULLET_RANGE = 360;
+
+// ── 무기 정의 ──────────────────────────────────────────
+const WEAPONS = {
+  sword:   { id:'sword',  name:'기본 검',    emoji:'🗡',  cd:22,  dmg:32, spd:10, range:360, spread:0,   count:1, pierce:false, desc:'기본 근접 공격',      col:'#88ddff' },
+  pistol:  { id:'pistol', name:'권총',       emoji:'🔫',  cd:18,  dmg:22, spd:13, range:420, spread:0.1, count:1, pierce:false, desc:'빠른 단발 권총',       col:'#ffdd44' },
+  shotgun: { id:'shotgun',name:'산탄총',     emoji:'💥',  cd:45,  dmg:28, spd:9,  range:260, spread:0.35,count:5, pierce:false, desc:'5발 산탄 — 근거리 강력',col:'#ff8844' },
+  rifle:   { id:'rifle',  name:'저격 소총',  emoji:'🎯',  cd:55,  dmg:70, spd:18, range:700, spread:0,   count:1, pierce:true,  desc:'관통 · 고데미지',      col:'#44ff88' },
+  smg:     { id:'smg',    name:'기관단총',   emoji:'⚡',  cd:8,   dmg:12, spd:12, range:320, spread:0.18,count:1, pierce:false, desc:'초고속 연사',           col:'#aaaaff' },
+  laser:   { id:'laser',  name:'레이저',     emoji:'🔴',  cd:35,  dmg:55, spd:22, range:600, spread:0,   count:1, pierce:true,  desc:'고속 관통 레이저',     col:'#ff2244' },
+  cannon:  { id:'cannon', name:'캐논',       emoji:'💣',  cd:90,  dmg:120,spd:7,  range:380, spread:0,   count:1, pierce:false, desc:'초고데미지 단발',       col:'#ff6600' },
+  twin:    { id:'twin',   name:'쌍권총',     emoji:'🔫',  cd:14,  dmg:18, spd:12, range:380, spread:0.08,count:2, pierce:false, desc:'2발 동시 발사',         col:'#ffaa00' },
+};
+
+// 무기 드랍 풀 (sword 제외 — 기본 무기)
+const WEAPON_DROP_POOL = ['pistol','shotgun','rifle','smg','laser','cannon','twin'];
 // 스킬 쿨다운 (프레임)
 const CD_BOMB    = 360;  // Z: 폭탄 6초
 const CD_SHIELD  = 480;  // X: 방패 8초
@@ -653,7 +669,9 @@ function initGame(keepStage=false){
     x: sr.cx * TILE, y: sr.cy * TILE,
     hp: P_HP, maxHp: P_HP,
     alive: true, iframes: 0, attackCd: 0,
-    facing: 0, // 오른쪽이 기본
+    facing: 0,
+    weapon: 'sword',   // 현재 무기
+    weaponAmmo: {},    // 무기별 남은 탄약 (무한=null)
   };
   camX = player.x - canvas.width/2;
   camY = player.y - canvas.height/2;
@@ -668,6 +686,7 @@ function initGame(keepStage=false){
 
   if(stage===1){
     startBGM(); setBGMStage(stage); addMuteButton();
+  updateWeaponHUD();
   addLog('⚔ 던전 탐험을 시작합니다!','win');
     addLog('보스 방을 찾아 던전의 군주를 처치하라!');
   } else {
@@ -850,15 +869,27 @@ function spawnBoss(){
 // ═══════════════════════════════════════════════════════
 function doAttack(){
   if(!gameRunning||!player.alive||player.attackCd>0) return;
-  player.attackCd=P_CD;
-  // 마지막 이동 방향으로 발사 (유도 없음)
-  const angle = player.facing !== undefined ? player.facing : 0;
-  bullets.push({
-    x:player.x, y:player.y,
-    vx:Math.cos(angle)*BULLET_SPEED,
-    vy:Math.sin(angle)*BULLET_SPEED,
-    dist:0, angle, alive:true,
-  });
+  const wp=WEAPONS[player.weapon]||WEAPONS.sword;
+  player.attackCd=wp.cd;
+  const angle=player.facing!==undefined?player.facing:0;
+  SFX.shoot();
+  for(let i=0;i<wp.count;i++){
+    const sp=wp.count>1?((i-(wp.count-1)/2)*wp.spread*1.1):(Math.random()-0.5)*wp.spread;
+    const a=angle+sp;
+    bullets.push({
+      x:player.x,y:player.y,
+      vx:Math.cos(a)*wp.spd,
+      vy:Math.sin(a)*wp.spd,
+      dist:0,angle:a,alive:true,
+      dmgOverride:wp.dmg,
+      pierce:wp.pierce,
+      range:wp.range,
+      col:wp.col,
+      len:wp.id==='laser'?36:wp.id==='rifle'?30:24,
+      w:wp.id==='cannon'?8:wp.id==='laser'?3:4,
+      isMob:false,
+    });
+  }
 }
 
 function doSkillBomb(){
@@ -910,7 +941,12 @@ function killMonster(m){
   if(Math.random()<0.30){
     const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
     const it=iTypes[Math.random()*iTypes.length|0];
-    items.push({x:m.x,y:m.y,type:it,life:600,pulse:0});
+    items.push({id:nextId++,x:m.x,y:m.y,type:it,life:600,pulse:0});
+  }
+  // 무기 드랍 (스테이지 2+, 15%)
+  if(stage>=2&&Math.random()<0.15){
+    const wt=WEAPON_DROP_POOL[Math.random()*WEAPON_DROP_POOL.length|0];
+    items.push({id:nextId++,x:m.x+(Math.random()-0.5)*40,y:m.y+(Math.random()-0.5)*40,type:'weapon_'+wt,life:900,pulse:0});
   }
   if(m.type&&m.type.startsWith('boss')){
     bossDefeated=true; gameRunning=false;
@@ -926,8 +962,12 @@ function killMonster(m){
   }
 }
 
-const ITEM_EMOJI={hp:'❤️',bomb_charge:'💣',shield_charge:'🛡',thunder_charge:'⚡',speed:'👟'};
-const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_charge:'#ccf',speed:'#4f8'};
+const ITEM_EMOJI={hp:'❤️',bomb_charge:'💣',shield_charge:'🛡',thunder_charge:'⚡',speed:'👟',
+  weapon_pistol:'🔫',weapon_shotgun:'💥',weapon_rifle:'🎯',weapon_smg:'⚡',
+  weapon_laser:'🔴',weapon_cannon:'💣',weapon_twin:'🔫'};
+const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_charge:'#ccf',speed:'#4f8',
+  weapon_pistol:'#ffdd44',weapon_shotgun:'#ff8844',weapon_rifle:'#44ff88',
+  weapon_smg:'#aaaaff',weapon_laser:'#ff2244',weapon_cannon:'#ff6600',weapon_twin:'#ffaa00'};
 
 // ═══════════════════════════════════════════════════════
 //  파티클
@@ -1144,7 +1184,17 @@ function update(){
         player.speedBoost=(player.speedBoost||0)+180;
         addLog('👟 속도 부스트 3초!','win');
       }
-      spawnParticles(it.x,it.y,ITEM_COL[it.type],12);
+      else if(it.type&&it.type.startsWith('weapon_')){
+        const wid=it.type.slice(7);const wp2=WEAPONS[wid];
+        if(wp2){
+          const prev=WEAPONS[player.weapon]||WEAPONS.sword;
+          player.weapon=wid; player.attackCd=0;
+          addLog(`${wp2.emoji} ${wp2.name} 획득! (${prev.emoji}→${wp2.emoji})  ${wp2.desc}`,'win');
+          updateWeaponHUD();
+        }
+      }
+      const icol=it.type.startsWith('weapon_')?WEAPONS[it.type.slice(7)]?.col||'#ffd':ITEM_COL[it.type]||'#ffd';
+      spawnParticles(it.x,it.y,icol,12);
     }
   });
   items=items.filter(it=>it.life>0);
@@ -1209,8 +1259,9 @@ function update(){
       monsters.forEach(m=>{
         if(!m.alive||!b.alive) return;
         if(Math.hypot(m.x-b.x,m.y-b.y)<m.size+4){
-          b.alive=false;
-          m.hp-=P_ATK;
+          if(!b.pierce) b.alive=false;
+          const dmg=b.dmgOverride||P_ATK;
+          m.hp-=dmg;
           SFX.hitMonster();
           spawnParticles(m.x,m.y,m.col,6);
           if(m.hp<=0) killMonster(m);
@@ -1628,17 +1679,14 @@ function draw(){
       ctx.fillStyle='#fff'; ctx.shadowBlur=18;
       ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
     } else {
-      // 플레이어 투사체: 파란색
-      ctx.shadowColor='#88ddff'; ctx.shadowBlur=10;
-      const grad=ctx.createLinearGradient(tailX,tailY,sx,sy);
-      grad.addColorStop(0,'rgba(68,170,255,0)');
-      grad.addColorStop(0.4,'rgba(100,200,255,0.7)');
-      grad.addColorStop(1,'rgba(220,240,255,1)');
-      ctx.strokeStyle=grad;
-      ctx.lineWidth=3.5; ctx.lineCap='round';
+      const pc=b.col||'#88ddff';
+      ctx.shadowColor=pc; ctx.shadowBlur=12;
+      const gp=ctx.createLinearGradient(tailX,tailY,sx,sy);
+      gp.addColorStop(0,'rgba(0,0,0,0)'); gp.addColorStop(0.4,pc+'aa'); gp.addColorStop(1,pc);
+      ctx.strokeStyle=gp; ctx.lineWidth=b.w||3.5; ctx.lineCap='round';
       ctx.beginPath(); ctx.moveTo(tailX,tailY); ctx.lineTo(sx,sy); ctx.stroke();
-      ctx.shadowBlur=16; ctx.fillStyle='#ffffff';
-      ctx.beginPath(); ctx.arc(sx,sy,3,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=16; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(sx,sy,2.5,0,Math.PI*2); ctx.fill();
     }
     ctx.restore();
   });
@@ -3128,6 +3176,42 @@ function drawCharVampire(c,x,y,sz,facing,t,elite){
   c.restore();
 }
 
+// ── 캐릭터 오프스크린 캐시 ──────────────────────────
+const _charCache = new Map();
+let   _charCacheTick = 0;
+
+// 8fps 애니 프레임 (0~7)
+function _animFrame(t){ return (t/7|0)%8; }
+
+function _getCachedChar(type, sz, facingDir, elite, enraged, animF, drawFn){
+  const key = type+'|'+sz+'|'+facingDir+'|'+(elite?1:0)+'|'+(enraged?1:0)+'|'+animF;
+  if(_charCache.has(key)) return _charCache.get(key);
+
+  const dim = sz*3.2|0;
+  const oc  = document.createElement('canvas');
+  oc.width = dim; oc.height = dim;
+  const oc2 = oc.getContext('2d');
+  // facingDir 0=right,1=left → angle
+  const faceAngle = facingDir===1 ? Math.PI : 0;
+  drawFn(oc2, dim/2, dim/2, sz, faceAngle, animF*7, elite||enraged);
+  _charCache.set(key, oc);
+  // 캐시 크기 제한
+  if(_charCache.size > 400) {
+    const firstKey = _charCache.keys().next().value;
+    _charCache.delete(firstKey);
+  }
+  return oc;
+}
+
+function drawCachedChar(c, type, x, y, sz, facing, t, elite, enraged){
+  const drawFn = CHAR_DRAW[type];
+  if(!drawFn) return;
+  const facingDir = Math.cos(facing||0) < 0 ? 1 : 0;
+  const animF     = _animFrame(t);
+  const img = _getCachedChar(type, sz|0, facingDir, !!elite, !!enraged, animF, drawFn);
+  c.drawImage(img, x - img.width/2|0, y - img.height/2|0);
+}
+
 // ── 캐릭터 타입 → 드로우 함수 매핑 ──────────────────
 const CHAR_DRAW = {
   player:    (c,x,y,sz,f,t,e)=>drawCharPlayer(c,x,y,sz,f,t),
@@ -3157,12 +3241,17 @@ const CHAR_DRAW = {
 
 // ── 몬스터 그리기 래퍼 ───────────────────────────────
 function drawMonsterSprite(c, m, sx, sy){
-  const fn=CHAR_DRAW[m.type];
-  if(!fn) return;
+  if(!CHAR_DRAW[m.type]) return;
   const isBoss=m.type&&m.type.startsWith('boss');
   const sz=isBoss?m.size*1.8:m.size*1.5;
   c.save();
-  fn(c, sx, sy, sz, m.aimAngle||0, tick, m.elite||m.enraged);
+  // warnPhase일 때 붉은 틴트
+  if(m.warnPhase||m.enraged){
+    c.shadowColor=m.enraged?'#f60':'#f44';
+    c.shadowBlur=m.enraged?18:10;
+  }
+  drawCachedChar(c, m.type, sx, sy, sz, m.aimAngle||0, tick, m.elite, m.enraged);
+  c.shadowBlur=0;
   c.restore();
 }
 
@@ -3172,7 +3261,7 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive){
   else if(blinking){ c.globalAlpha=0.5; }
   else { c.globalAlpha=1; }
   const sz=22;
-  drawCharPlayer(c,sx,sy,sz,facing,tick);
+  drawCachedChar(c,'player',sx,sy,sz,facing,tick,false,false);
   c.globalAlpha=1;
 }
 
@@ -3229,6 +3318,18 @@ function showAlert(msg){
   el.style.display='block';
   clearTimeout(alertTimer);
   alertTimer=setTimeout(()=>el.style.display='none',3200);
+}
+
+// ── 무기 HUD 업데이트 ────────────────────────────────
+function updateWeaponHUD(){
+  if(!player) return;
+  const wp=WEAPONS[player.weapon]||WEAPONS.sword;
+  const ee=document.getElementById('weapon-emoji');
+  const en=document.getElementById('weapon-name');
+  const ed=document.getElementById('weapon-desc');
+  if(ee) ee.textContent=wp.emoji;
+  if(en) en.textContent=wp.name;
+  if(ed) ed.textContent=wp.desc;
 }
 
 // ── 스테이지 클리어 화면 ──────────────────────────────
