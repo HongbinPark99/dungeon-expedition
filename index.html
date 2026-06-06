@@ -474,6 +474,434 @@ let screenShake=0;
 let spawnTimer=0;
 let logEntries=[];
 
+
+// ═══════════════════════════════════════════════════════
+//  효과음 시스템 — Web Audio API 합성음
+// ═══════════════════════════════════════════════════════
+let _audioCtx = null;
+let _sfxMuted = false;
+let _bgmGain  = null;
+let _bgmOscs  = [];
+
+function _getACtx(){
+  if(!_audioCtx){
+    _audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  }
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+// ── 기본 음 합성 유틸 ─────────────────────────────────
+function _playTone(freq, type, dur, vol=0.3, detune=0, delay=0){
+  if(_sfxMuted) return;
+  try{
+    const ac=_getACtx();
+    const osc=ac.createOscillator();
+    const gain=ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type=type; osc.frequency.value=freq; osc.detune.value=detune;
+    const t=ac.currentTime+delay;
+    gain.gain.setValueAtTime(vol,t);
+    gain.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    osc.start(t); osc.stop(t+dur+0.05);
+  }catch(e){}
+}
+
+function _playNoise(dur, vol=0.15, hipass=800){
+  if(_sfxMuted) return;
+  try{
+    const ac=_getACtx();
+    const bufSize=ac.sampleRate*dur;
+    const buf=ac.createBuffer(1,bufSize,ac.sampleRate);
+    const data=buf.getChannelData(0);
+    for(let i=0;i<bufSize;i++) data[i]=(Math.random()*2-1);
+    const src2=ac.createBufferSource();
+    src2.buffer=buf;
+    const filter=ac.createBiquadFilter();
+    filter.type='highpass'; filter.frequency.value=hipass;
+    const gain=ac.createGain();
+    src2.connect(filter); filter.connect(gain); gain.connect(ac.destination);
+    const t=ac.currentTime;
+    gain.gain.setValueAtTime(vol,t);
+    gain.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src2.start(t); src2.stop(t+dur+0.05);
+  }catch(e){}
+}
+
+// ── 효과음 정의 ───────────────────────────────────────
+const SFX = {
+  // 플레이어 총알 발사
+  shoot(){
+    _playTone(880,'square',0.06,0.18);
+    _playTone(660,'sawtooth',0.08,0.12,0,0.02);
+    _playNoise(0.05,0.08,2000);
+  },
+
+  // 몬스터 피격
+  hitMonster(){
+    _playTone(220,'sawtooth',0.1,0.2,-300);
+    _playNoise(0.06,0.1,600);
+  },
+
+  // 플레이어 피격
+  hitPlayer(){
+    _playTone(150,'sawtooth',0.18,0.35,-200);
+    _playTone(100,'sine',0.25,0.2,0,0.05);
+    _playNoise(0.12,0.2,200);
+  },
+
+  // 몬스터 처치
+  kill(){
+    _playTone(440,'square',0.05,0.2);
+    _playTone(550,'square',0.05,0.2,0,0.06);
+    _playTone(660,'square',0.1,0.25,0,0.12);
+    _playNoise(0.08,0.12,1000);
+  },
+
+  // 보스 등장
+  bossSpawn(){
+    [55,65,80,100].forEach((f,i)=>{
+      _playTone(f,'sawtooth',0.6,0.4,0,i*0.15);
+    });
+    _playNoise(0.4,0.25,50);
+    _playTone(220,'sine',0.8,0.3,0,0.5);
+  },
+
+  // 보스 처치
+  bossKill(){
+    [880,1100,1320,1760].forEach((f,i)=>{
+      _playTone(f,'square',0.3,0.3,0,i*0.1);
+    });
+    [220,330,440].forEach((f,i)=>{
+      _playTone(f,'sine',0.8,0.4,0,0.4+i*0.15);
+    });
+  },
+
+  // 폭탄 폭발
+  explode(){
+    _playNoise(0.5,0.4,30);
+    _playTone(80,'sawtooth',0.4,0.5,-400);
+    _playTone(60,'sine',0.6,0.4,0,0.05);
+  },
+
+  // 방패
+  shield(){
+    _playTone(660,'sine',0.1,0.25);
+    _playTone(880,'sine',0.15,0.2,0,0.08);
+    _playTone(1100,'sine',0.2,0.15,0,0.16);
+  },
+
+  // 번개
+  thunder(){
+    _playNoise(0.15,0.35,3000);
+    _playTone(110,'sawtooth',0.3,0.4,-100);
+    _playTone(880,'square',0.05,0.2,0,0.05);
+  },
+
+  // 아이템 획득
+  item(){
+    [523,659,784,1047].forEach((f,i)=>{
+      _playTone(f,'sine',0.12,0.2,0,i*0.06);
+    });
+  },
+
+  // 스테이지 클리어
+  stageClear(){
+    const melody=[523,659,784,1047,784,880,1047,1319];
+    melody.forEach((f,i)=>{
+      _playTone(f,'square',0.15,0.22,0,i*0.12);
+    });
+  },
+
+  // 게임오버
+  gameOver(){
+    [440,330,220,165].forEach((f,i)=>{
+      _playTone(f,'sawtooth',0.4,0.3,0,i*0.25);
+    });
+    _playNoise(0.3,0.15,100,0,1.0);
+  },
+
+  // 발걸음 (조용하게)
+  step(){
+    _playNoise(0.04,0.04,400);
+  },
+
+  // 경고음 (몬스터 공격 임박)
+  warning(){
+    _playTone(880,'sine',0.05,0.08);
+  },
+
+  // 문 열림 / 보스방 진입
+  door(){
+    [220,330,440].forEach((f,i)=>{
+      _playTone(f,'sine',0.2,0.2,0,i*0.1);
+    });
+  },
+
+  // UI 클릭
+  click(){
+    _playTone(440,'sine',0.06,0.1);
+  },
+};
+
+// ── BGM (간단한 절차적 음악) ──────────────────────────
+function startBGM(){
+  if(_sfxMuted) return;
+  stopBGM();
+  try{
+    const ac=_getACtx();
+    _bgmGain=ac.createGain();
+    _bgmGain.gain.value=0.04;
+    _bgmGain.connect(ac.destination);
+
+    // 드론 베이스 (저음 지속)
+    [55,110].forEach(freq=>{
+      const osc=ac.createOscillator();
+      const g=ac.createGain();
+      osc.type='sawtooth'; osc.frequency.value=freq;
+      g.gain.value=0.3;
+      osc.connect(g); g.connect(_bgmGain);
+      osc.start(); _bgmOscs.push(osc);
+    });
+
+    // 리듬 패턴 (간헐적 하이햇 느낌)
+    let beat=0;
+    const rhythm=setInterval(()=>{
+      if(_sfxMuted||!_bgmGain){ clearInterval(rhythm); return; }
+      if(beat%4===0) _playNoise(0.04,0.02,2000);
+      if(beat%8===0){
+        _playTone(110,'sine',0.1,0.015,0);
+      }
+      beat++;
+    },250);
+    _bgmOscs.push({stop:()=>clearInterval(rhythm)});
+  }catch(e){}
+}
+
+function stopBGM(){
+  _bgmOscs.forEach(o=>{ try{ o.stop(); }catch(e){} });
+  _bgmOscs=[];
+  if(_bgmGain){ try{_bgmGain.disconnect();}catch(e){} _bgmGain=null; }
+}
+
+function setBGMStage(s){
+  if(_bgmGain) _bgmGain.gain.value=0.03+Math.min(s,5)*0.008;
+}
+
+// ── 뮤트 토글 버튼 ───────────────────────────────────
+function addMuteButton(){
+  const btn=document.createElement('button');
+  btn.id='mute-btn';
+  btn.textContent='🔊';
+  btn.style.cssText=`position:fixed;top:12px;left:50%;transform:translateX(-50%);
+    z-index:20;background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;
+    padding:6px 14px;color:#ccd;font-size:1rem;cursor:pointer;
+    backdrop-filter:blur(6px);transition:.15s;`;
+  btn.addEventListener('click',()=>{
+    _sfxMuted=!_sfxMuted;
+    btn.textContent=_sfxMuted?'🔇':'🔊';
+    if(_sfxMuted) stopBGM();
+    else startBGM();
+    SFX.click();
+  });
+  document.getElementById('game').appendChild(btn);
+}
+
+// ═══════════════════════════════════════════════════════
+//  효과음 시스템 — Web Audio API 합성음
+// ═══════════════════════════════════════════════════════
+let _audioCtx=null, _sfxMuted=false, _bgmGain=null, _bgmOscs=[];
+
+function _getACtx(){
+  if(!_audioCtx) _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+function _tone(freq,type,dur,vol=0.25,detune=0,delay=0){
+  if(_sfxMuted) return;
+  try{
+    const ac=_getACtx(), o=ac.createOscillator(), g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type=type; o.frequency.value=freq; o.detune.value=detune;
+    const t=ac.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.start(t); o.stop(t+dur+0.05);
+  }catch(e){}
+}
+function _noise(dur,vol=0.15,hi=800,delay=0){
+  if(_sfxMuted) return;
+  try{
+    const ac=_getACtx(), sz=ac.sampleRate*dur|0;
+    const buf=ac.createBuffer(1,sz,ac.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<sz;i++) d[i]=Math.random()*2-1;
+    const src2=ac.createBufferSource();
+    src2.buffer=buf;
+    const f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=hi;
+    const g=ac.createGain();
+    src2.connect(f); f.connect(g); g.connect(ac.destination);
+    const t=ac.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src2.start(t); src2.stop(t+dur+0.05);
+  }catch(e){}
+}
+
+const SFX={
+  shoot(){ _tone(780,'square',0.06,0.15); _noise(0.04,0.06,2200); },
+  hitMonster(){ _tone(200,'sawtooth',0.08,0.18,-200); _noise(0.05,0.08,700); },
+  hitPlayer(){ _tone(140,'sawtooth',0.2,0.32,-200); _noise(0.1,0.18,200); _tone(90,'sine',0.25,0.18,0,0.06); },
+  kill(){ _tone(440,'square',0.04,0.18); _tone(550,'square',0.04,0.2,0,0.05); _tone(660,'square',0.09,0.22,0,0.1); },
+  bossSpawn(){ [55,70,88,110].forEach((f,i)=>_tone(f,'sawtooth',0.7,0.4,0,i*0.14)); _noise(0.35,0.22,40); _tone(220,'sine',0.9,0.28,0,0.55); },
+  bossKill(){ [880,1100,1320,1760].forEach((f,i)=>_tone(f,'square',0.25,0.28,0,i*0.1)); [220,330,440,550].forEach((f,i)=>_tone(f,'sine',0.7,0.35,0,0.45+i*0.12)); },
+  explode(){ _noise(0.45,0.38,30); _tone(75,'sawtooth',0.4,0.45,-400); _tone(55,'sine',0.55,0.35,0,0.06); },
+  shield(){ [660,880,1100].forEach((f,i)=>_tone(f,'sine',0.15,0.22,0,i*0.07)); },
+  thunder(){ _noise(0.12,0.32,3000); _tone(105,'sawtooth',0.28,0.38,-80); },
+  item(){ [523,659,784,1047].forEach((f,i)=>_tone(f,'sine',0.1,0.18,0,i*0.055)); },
+  stageClear(){ [523,659,784,1047,784,880,1047,1319].forEach((f,i)=>_tone(f,'square',0.13,0.2,0,i*0.11)); },
+  gameOver(){ [440,330,220,165,110].forEach((f,i)=>_tone(f,'sawtooth',0.4,0.28,0,i*0.22)); },
+  warning(){ _tone(920,'sine',0.04,0.07); },
+  door(){ [220,330,440].forEach((f,i)=>_tone(f,'sine',0.18,0.18,0,i*0.09)); },
+  step(){ _noise(0.035,0.035,500); },
+  click(){ _tone(440,'sine',0.05,0.09); },
+};
+
+function startBGM(){
+  if(_sfxMuted) return;
+  stopBGM();
+  try{
+    const ac=_getACtx();
+    _bgmGain=ac.createGain(); _bgmGain.gain.value=0.038; _bgmGain.connect(ac.destination);
+    [55,110].forEach(freq=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.type='sawtooth'; o.frequency.value=freq; g.gain.value=0.28;
+      o.connect(g); g.connect(_bgmGain); o.start(); _bgmOscs.push(o);
+    });
+    let beat=0;
+    const rid=setInterval(()=>{
+      if(_sfxMuted||!_bgmGain){clearInterval(rid);return;}
+      if(beat%4===0) _noise(0.035,0.018,2400);
+      if(beat%8===0) _tone(110,'sine',0.08,0.012);
+      beat++;
+    },260);
+    _bgmOscs.push({stop:()=>clearInterval(rid)});
+  }catch(e){}
+}
+function stopBGM(){
+  _bgmOscs.forEach(o=>{try{o.stop();}catch(e){}});
+  _bgmOscs=[];
+  if(_bgmGain){try{_bgmGain.disconnect();}catch(e){}_bgmGain=null;}
+}
+function setBGMStage(s){ if(_bgmGain) _bgmGain.gain.value=0.03+Math.min(s,5)*0.007; }
+
+function addMuteButton(){
+  if(document.getElementById('mute-btn')) return;
+  const btn=document.createElement('button');
+  btn.id='mute-btn'; btn.textContent='🔊';
+  btn.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:20;background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;padding:5px 14px;color:#ccd;font-size:1rem;cursor:pointer;backdrop-filter:blur(6px);';
+  btn.addEventListener('click',()=>{
+    _sfxMuted=!_sfxMuted; btn.textContent=_sfxMuted?'🔇':'🔊';
+    if(_sfxMuted) stopBGM(); else { SFX.click(); startBGM(); }
+  });
+  document.getElementById('game').appendChild(btn);
+}
+
+
+// ═══════════════════════════════════════════════════════
+//  효과음 시스템 — Web Audio API 합성음
+// ═══════════════════════════════════════════════════════
+let _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
+function _getACtx(){
+  if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_audioCtx.state==='suspended')_audioCtx.resume();
+  return _audioCtx;
+}
+function _tone(freq,type,dur,vol=0.25,detune=0,delay=0){
+  if(_sfxMuted)return;
+  try{
+    const ac=_getACtx(),o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g);g.connect(ac.destination);
+    o.type=type;o.frequency.value=freq;o.detune.value=detune;
+    const t=ac.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.start(t);o.stop(t+dur+0.05);
+  }catch(e){}
+}
+function _noise(dur,vol=0.15,hi=800,delay=0){
+  if(_sfxMuted)return;
+  try{
+    const ac=_getACtx(),sz=ac.sampleRate*dur|0;
+    const buf=ac.createBuffer(1,sz,ac.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;
+    const src2=ac.createBufferSource();src2.buffer=buf;
+    const f=ac.createBiquadFilter();f.type='highpass';f.frequency.value=hi;
+    const g=ac.createGain();
+    src2.connect(f);f.connect(g);g.connect(ac.destination);
+    const t=ac.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    src2.start(t);src2.stop(t+dur+0.05);
+  }catch(e){}
+}
+const SFX={
+  shoot(){_tone(780,'square',0.06,0.15);_noise(0.04,0.06,2200);},
+  hitMonster(){_tone(200,'sawtooth',0.08,0.18,-200);_noise(0.05,0.08,700);},
+  hitPlayer(){_tone(140,'sawtooth',0.2,0.32,-200);_noise(0.1,0.18,200);_tone(90,'sine',0.25,0.18,0,0.06);},
+  kill(){_tone(440,'square',0.04,0.18);_tone(550,'square',0.04,0.2,0,0.05);_tone(660,'square',0.09,0.22,0,0.1);},
+  bossSpawn(){[55,70,88,110].forEach((f,i)=>_tone(f,'sawtooth',0.7,0.4,0,i*0.14));_noise(0.35,0.22,40);_tone(220,'sine',0.9,0.28,0,0.55);},
+  bossKill(){[880,1100,1320,1760].forEach((f,i)=>_tone(f,'square',0.25,0.28,0,i*0.1));[220,330,440,550].forEach((f,i)=>_tone(f,'sine',0.7,0.35,0,0.45+i*0.12));},
+  explode(){_noise(0.45,0.38,30);_tone(75,'sawtooth',0.4,0.45,-400);_tone(55,'sine',0.55,0.35,0,0.06);},
+  shield(){[660,880,1100].forEach((f,i)=>_tone(f,'sine',0.15,0.22,0,i*0.07));},
+  thunder(){_noise(0.12,0.32,3000);_tone(105,'sawtooth',0.28,0.38,-80);},
+  item(){[523,659,784,1047].forEach((f,i)=>_tone(f,'sine',0.1,0.18,0,i*0.055));},
+  stageClear(){[523,659,784,1047,784,880,1047,1319].forEach((f,i)=>_tone(f,'square',0.13,0.2,0,i*0.11));},
+  gameOver(){[440,330,220,165,110].forEach((f,i)=>_tone(f,'sawtooth',0.4,0.28,0,i*0.22));},
+  warning(){_tone(920,'sine',0.04,0.07);},
+  door(){[220,330,440].forEach((f,i)=>_tone(f,'sine',0.18,0.18,0,i*0.09));},
+  step(){_noise(0.035,0.03,500);},
+  click(){_tone(440,'sine',0.05,0.09);},
+};
+function startBGM(){
+  if(_sfxMuted)return;
+  stopBGM();
+  try{
+    const ac=_getACtx();
+    _bgmGain=ac.createGain();_bgmGain.gain.value=0.038;_bgmGain.connect(ac.destination);
+    [55,110].forEach(freq=>{
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.28;
+      o.connect(g);g.connect(_bgmGain);o.start();_bgmOscs.push(o);
+    });
+    let beat=0;
+    const rid=setInterval(()=>{
+      if(_sfxMuted||!_bgmGain){clearInterval(rid);return;}
+      if(beat%4===0)_noise(0.035,0.018,2400);
+      if(beat%8===0)_tone(110,'sine',0.08,0.012);
+      beat++;
+    },260);
+    _bgmOscs.push({stop:()=>clearInterval(rid)});
+  }catch(e){}
+}
+function stopBGM(){
+  _bgmOscs.forEach(o=>{try{o.stop();}catch(e){}});
+  _bgmOscs=[];
+  if(_bgmGain){try{_bgmGain.disconnect();}catch(e){}_bgmGain=null;}
+}
+function setBGMStage(s){if(_bgmGain)_bgmGain.gain.value=0.03+Math.min(s,5)*0.007;}
+function addMuteButton(){
+  if(document.getElementById('mute-btn'))return;
+  const btn=document.createElement('button');
+  btn.id='mute-btn';btn.textContent='🔊';
+  btn.style.cssText='position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:20;background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;padding:5px 14px;color:#ccd;font-size:1rem;cursor:pointer;backdrop-filter:blur(6px);';
+  btn.onclick=()=>{
+    _sfxMuted=!_sfxMuted;btn.textContent=_sfxMuted?'🔇':'🔊';
+    if(_sfxMuted)stopBGM();else{SFX.click();startBGM();}
+  };
+  document.getElementById('game').appendChild(btn);
+}
+
+
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
 const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
@@ -558,7 +986,8 @@ function initGame(keepStage=false){
   for(let i=0;i<initCount;i++) spawnMonster();
 
   if(stage===1){
-    addLog('⚔ 던전 탐험을 시작합니다!','win');
+    startBGM(); setBGMStage(stage); addMuteButton();
+  addLog('⚔ 던전 탐험을 시작합니다!','win');
     addLog('보스 방을 찾아 던전의 군주를 처치하라!');
   } else {
     addLog(`🗺 스테이지 ${stage} 진입! 맵이 넓어졌다...`,'win');
@@ -728,6 +1157,7 @@ function spawnBoss(){
   });
   bossSpawned=true;
   screenShake=60;
+  SFX.bossSpawn();
   const bossEmoji=MEMOJI[bossType]||'👑';
   showAlert(`${bossEmoji} ${cfg.label} 등장!`);
   addLog(`${bossEmoji} ${cfg.label}이(가) 각성했다!!!`,'boss');
@@ -753,6 +1183,7 @@ function doAttack(){
 function doSkillBomb(){
   if(!gameRunning||!player.alive||skillCd.bomb>0) return;
   skillCd.bomb=CD_BOMB;
+  SFX.explode();
   const angle=player.facing!==undefined?player.facing:0;
   bombs.push({
     x:player.x, y:player.y,
@@ -766,6 +1197,7 @@ function doSkillBomb(){
 function doSkillShield(){
   if(!gameRunning||!player.alive||skillCd.shield>0) return;
   skillCd.shield=CD_SHIELD;
+  SFX.shield();
   shieldActive=120; // 2초 방패
   addLog('🛡 방패막 발동! 2초간 무적');
 }
@@ -804,6 +1236,7 @@ function killMonster(m){
     totalKills+=kills;
     const nextBossType=getBossType(stage+1);
     const nextBossCfg=MTYPE[nextBossType];
+    SFX.stageClear(); setBGMStage(stage+1);
     addLog(`🏆 스테이지 ${stage} 보스 처치!`,'win');
     if(nextBossCfg) addLog(`다음: ${MEMOJI[nextBossType]||'👑'} ${nextBossCfg.label}이(가) 기다린다...`,'boss');
     setTimeout(()=>showStageCleared(),800);
@@ -856,6 +1289,7 @@ function update(){
     if(dx||dy){
       const len=Math.hypot(dx,dy);
       // facing은 마우스가 움직였을 때 이미 업데이트됨 — 이동방향으론 덮지 않음
+      if(tick%18===0) SFX.step();
       const spd2 = P_SPEED*(player.speedBoost>0?1.7:1);
       const nx=player.x+(dx/len)*spd2;
       const ny=player.y+(dy/len)*spd2;
@@ -868,6 +1302,7 @@ function update(){
     if(!bossSpawned){
       const ba=bossArena;
       if(player.x>ba.x&&player.x<ba.x+ba.w&&player.y>ba.y&&player.y<ba.y+ba.h){
+        SFX.door();
         spawnBoss();
       }
     }
@@ -922,6 +1357,7 @@ function update(){
       // ── 각 스타일별 공격 실행 ──────────────────────
       function dealDamage(extra=0){
         if(shielded) return;
+        SFX.hitPlayer();
         const dmg = m.atk + extra;
         player.hp -= dmg;
         player.iframes = IFRAMES;
@@ -931,6 +1367,7 @@ function update(){
         if(player.hp<=0){
           player.hp=0; player.alive=false;
           addLog('💀 전투 불능...','death');
+          SFX.gameOver();
           gameRunning=false;
           setTimeout(()=>showEnding(false),900);
         }
@@ -1009,6 +1446,7 @@ function update(){
     if(!player.alive) return;
     if(Math.hypot(it.x-player.x,it.y-player.y)<22){
       it.life=0;
+      SFX.item();
       if(it.type==='hp'){
         player.hp=Math.min(player.maxHp,player.hp+30);
         addLog('❤️ HP +30 회복','win');
@@ -1092,6 +1530,7 @@ function update(){
         if(Math.hypot(m.x-b.x,m.y-b.y)<m.size+4){
           b.alive=false;
           m.hp-=P_ATK;
+          SFX.hitMonster();
           spawnParticles(m.x,m.y,m.col,6);
           if(m.hp<=0) killMonster(m);
         }
@@ -1247,14 +1686,61 @@ function draw(){
   ctx.clearRect(-10,-10,W+20,H+20);
   ctx.fillStyle='#050810'; ctx.fillRect(-10,-10,W+20,H+20);
 
-  // ── 타일 (오프스크린 캐시 → drawImage 1회) ────────
+  // ── 타일 렌더링 (탐험 여부 + 시야 여부 2단계) ──────
   const px=player.x, py=player.y, sr2=SIGHT_R*SIGHT_R;
-  if(_tilesDirty) _rebuildTileCache();
-  // 탐험된 타일 전체를 한 번에
-  if(_tileCanvas){
-    ctx.drawImage(_tileCanvas, camX|0, camY|0, W, H, 0, 0, W, H);
+  {
+    const ts=TILE;
+    const c0=Math.max(0,(camX/ts)|0)-1;
+    const c1=Math.min(COLS,((camX+W)/ts|0)+2);
+    const r0=Math.max(0,(camY/ts)|0)-1;
+    const r1=Math.min(ROWS,((camY+H)/ts|0)+2);
+
+    for(let r=r0;r<r1;r++){
+      for(let c=c0;c<c1;c++){
+        const idx=r*COLS+c;
+        const exp=explored[idx];
+        const wx=c*ts, wy=r*ts;
+        const sx2=wx-camX|0, sy2=wy-camY|0;
+        const t=tiles[idx];
+
+        if(!exp){
+          // 미탐험: 완전히 검정
+          ctx.fillStyle='#000';
+          ctx.fillRect(sx2,sy2,ts,ts);
+          continue;
+        }
+
+        // 탐험됨: 시야 안팎 구분
+        const ddx=wx+ts/2-px, ddy=wy+ts/2-py;
+        const inSight=ddx*ddx+ddy*ddy<sr2*1.05;
+        const inBoss=bossArena&&wx>=bossArena.x-ts&&wx<bossArena.x+bossArena.w+ts
+                  &&wy>=bossArena.y-ts&&wy<bossArena.y+bossArena.h+ts;
+
+        if(inSight){
+          // 시야 안 — 밝게
+          if(t===1){
+            ctx.fillStyle='#1e2040'; ctx.fillRect(sx2,sy2,ts,ts);
+            ctx.fillStyle='#252848'; ctx.fillRect(sx2+2,sy2+2,ts-4,ts-4);
+            ctx.fillStyle='#2a305a'; ctx.fillRect(sx2+2,sy2+2,ts-4,3);
+            ctx.fillStyle='#2a305a'; ctx.fillRect(sx2+2,sy2+2,3,ts-4);
+          } else {
+            ctx.fillStyle=inBoss?'#1e0808':'#111228';
+            ctx.fillRect(sx2,sy2,ts,ts);
+            ctx.strokeStyle=inBoss?'#2a1010':'#151530';
+            ctx.lineWidth=.5; ctx.strokeRect(sx2,sy2,ts,ts);
+          }
+        } else {
+          // 탐험됐지만 시야 밖 — 어둡게 (기억된 지도)
+          if(t===1){
+            ctx.fillStyle='#0d0e20'; ctx.fillRect(sx2,sy2,ts,ts);
+          } else {
+            ctx.fillStyle=inBoss?'#120404':'#090a16';
+            ctx.fillRect(sx2,sy2,ts,ts);
+          }
+        }
+      }
+    }
   }
-  // 미탐험 영역은 fog가 덮으므로 별도 처리 불필요
 
   // ── 보스 방 테두리 ────────────────────────────────
   {
@@ -1563,7 +2049,7 @@ function draw(){
     ctx.restore();
   });
 
-  // ── Fog of War — 오프스크린 → drawImage ─────────────
+  // ── Fog — 시야 경계 소프트 마스크 ──────────────────
   {
     const psx=player.x-camX|0, psy=player.y-camY|0;
     if(!window._fog||window._fog.width!==W||window._fog.height!==H){
@@ -1573,18 +2059,20 @@ function draw(){
     }
     const fc2=window._fogC;
     fc2.clearRect(0,0,W,H);
-    fc2.fillStyle='rgba(5,8,16,0.93)'; fc2.fillRect(0,0,W,H);
+    // 시야 밖은 약간 어둡게 (탐험된 어두운 타일을 더 강조)
+    fc2.fillStyle='rgba(2,3,8,0.72)';
+    fc2.fillRect(0,0,W,H);
+    // 시야 원 구멍 뚫기
     fc2.globalCompositeOperation='destination-out';
-    const fg=fc2.createRadialGradient(psx,psy,SIGHT_R*0.35,psx,psy,SIGHT_R);
-    fg.addColorStop(0,'rgba(0,0,0,1)');
-    fg.addColorStop(0.6,'rgba(0,0,0,0.92)');
-    fg.addColorStop(1,'rgba(0,0,0,0)');
+    const fg=fc2.createRadialGradient(psx,psy,SIGHT_R*0.5,psx,psy,SIGHT_R);
+    fg.addColorStop(0,   'rgba(0,0,0,1)');
+    fg.addColorStop(0.72,'rgba(0,0,0,0.97)');
+    fg.addColorStop(1,   'rgba(0,0,0,0)');
     fc2.fillStyle=fg;
     fc2.beginPath(); fc2.arc(psx,psy,SIGHT_R,0,Math.PI*2); fc2.fill();
     fc2.globalCompositeOperation='source-over';
     ctx.drawImage(window._fog,0,0);
   }
-
   // ── 파티클 (fog 위) ───────────────────────────────
   particles.forEach(p=>{
     const ddx=p.x-player.x, ddy=p.y-player.y;
@@ -3146,7 +3634,7 @@ function loop(t=0){
 }
 
 // ── 버튼 ─────────────────────────────────────────────
-document.getElementById('start-btn').addEventListener('click',initGame);
+document.getElementById('start-btn').addEventListener('click',()=>{SFX.click();initGame();});
 document.getElementById('retry-btn').addEventListener('click',()=>{
   document.getElementById('ending').style.display='none';
   if(multiMode) connectMulti(currentServerUrl);
