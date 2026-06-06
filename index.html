@@ -574,76 +574,153 @@ function initGame(keepStage=false){
 }
 
 // ═══════════════════════════════════════════════════════
-//  몬스터
+//  몬스터 타입 정의
+//  tier: 등장 최소 스테이지
+//  attackStyle: fill_circle/cone/cross/line/ring/scatter/burst/dash
 // ═══════════════════════════════════════════════════════
-// attackStyle: fill_circle / fill_cone / fill_cross / fill_line / fill_ring / fill_scatter
 const MTYPE = {
-  // 원형: 원이 꽉 차면 전방위 폭발
-  goblin: { hp:55,  atk:18, spd:1.9, range:60,  warn:90,  cd:115, size:12, score:10, col:'#3c9', attackStyle:'fill_circle' },
-  // 십자: 십자 모양이 차면 상하좌우로 레이저 쏨
-  orc:    { hp:105, atk:32, spd:1.2, range:90,  warn:110, cd:145, size:17, score:20, col:'#e63', attackStyle:'fill_cross'  },
-  // 산탄: 원 안에서 8방향 총알이 퍼짐
-  shade:  { hp:45,  atk:22, spd:2.9, range:55,  warn:75,  cd:95,  size:11, score:15, col:'#99f', attackStyle:'fill_scatter'},
-  // 직선 레이저: 바가 꽉 차면 방향 레이저 발사
-  archer: { hp:65,  atk:24, spd:1.0, range:200, warn:145, cd:155, size:13, score:18, col:'#4c8', attackStyle:'fill_line'   },
-  // 링 수축: 링이 안으로 수축하면서 폭발
-  mage:   { hp:75,  atk:30, spd:0.9, range:110, warn:125, cd:165, size:14, score:25, col:'#c7f', attackStyle:'fill_ring'   },
-  // 원뿔: 원뿔 모양이 차면 그 방향으로 쐐기 공격
-  hunter: { hp:80,  atk:26, spd:1.5, range:130, warn:120, cd:140, size:15, score:22, col:'#fa4', attackStyle:'fill_cone'   },
-  // 보스: 페이즈별 복합 패턴
-  boss:   { hp:900, atk:55, spd:1.3, range:120, warn:155, cd:175, size:30, score:500,col:'#f40', attackStyle:'fill_cross'  },
+  // ── 티어 1 (스테이지 1~) ─────────────────────────
+  goblin:   { tier:1, hp:55,  atk:18, spd:1.9, range:60,  warn:90,  cd:115, size:12, score:10,  col:'#3c9', attackStyle:'fill_circle',  label:'고블린'  },
+  skeleton: { tier:1, hp:45,  atk:14, spd:2.2, range:50,  warn:80,  cd:100, size:11, score:8,   col:'#ccc', attackStyle:'fill_scatter', label:'스켈레톤' },
+  slime:    { tier:1, hp:70,  atk:12, spd:1.0, range:55,  warn:95,  cd:120, size:13, score:9,   col:'#6d4', attackStyle:'fill_circle',  label:'슬라임'  },
+
+  // ── 티어 2 (스테이지 2~) ─────────────────────────
+  orc:      { tier:2, hp:105, atk:32, spd:1.2, range:90,  warn:110, cd:145, size:17, score:20,  col:'#e63', attackStyle:'fill_cross',   label:'오크'    },
+  archer:   { tier:2, hp:65,  atk:24, spd:1.0, range:200, warn:145, cd:155, size:13, score:18,  col:'#4c8', attackStyle:'fill_line',    label:'아처'    },
+  shade:    { tier:2, hp:45,  atk:22, spd:2.9, range:55,  warn:75,  cd:95,  size:11, score:15,  col:'#99f', attackStyle:'fill_scatter', label:'섀도'    },
+  berserker:{ tier:2, hp:130, atk:38, spd:2.4, range:70,  warn:85,  cd:110, size:16, score:28,  col:'#f55', attackStyle:'fill_cone',    label:'광전사'  },
+
+  // ── 티어 3 (스테이지 3~) ─────────────────────────
+  mage:     { tier:3, hp:75,  atk:30, spd:0.9, range:110, warn:125, cd:165, size:14, score:25,  col:'#c7f', attackStyle:'fill_ring',    label:'마법사'  },
+  hunter:   { tier:3, hp:80,  atk:26, spd:1.5, range:130, warn:120, cd:140, size:15, score:22,  col:'#fa4', attackStyle:'fill_cone',    label:'헌터'    },
+  bomber:   { tier:3, hp:60,  atk:45, spd:1.3, range:100, warn:130, cd:180, size:14, score:30,  col:'#f80', attackStyle:'fill_circle',  label:'폭격수'  },
+  vampire:  { tier:3, hp:90,  atk:28, spd:2.1, range:80,  warn:100, cd:130, size:14, score:32,  col:'#d4f', attackStyle:'fill_scatter', label:'뱀파이어' },
+
+  // ── 티어 4 (스테이지 4~) ─────────────────────────
+  golem:    { tier:4, hp:280, atk:42, spd:0.7, range:95,  warn:140, cd:200, size:22, score:55,  col:'#888', attackStyle:'fill_cross',   label:'골렘'    },
+  wraith:   { tier:4, hp:70,  atk:35, spd:3.2, range:90,  warn:90,  cd:120, size:12, score:40,  col:'#8af', attackStyle:'fill_line',    label:'망령'    },
+  hydra:    { tier:4, hp:160, atk:30, spd:1.1, range:120, warn:115, cd:135, size:18, score:48,  col:'#4fa', attackStyle:'fill_ring',    label:'히드라'  },
+
+  // ── 티어 5 (스테이지 5~) ─────────────────────────
+  lich:     { tier:5, hp:200, atk:50, spd:1.2, range:160, warn:140, cd:155, size:18, score:80,  col:'#b8f', attackStyle:'fill_scatter', label:'리치'    },
+  dragon:   { tier:5, hp:350, atk:58, spd:1.8, range:140, warn:150, cd:170, size:24, score:120, col:'#f84', attackStyle:'fill_cone',    label:'드래곤'  },
+  demon:    { tier:5, hp:240, atk:48, spd:1.6, range:130, warn:130, cd:145, size:20, score:95,  col:'#c22', attackStyle:'fill_cross',   label:'데몬'    },
+
+  // ── 보스 (스테이지별 다른 보스) ───────────────────
+  boss:     { tier:1, hp:900, atk:55, spd:1.3, range:120, warn:155, cd:175, size:30, score:500, col:'#f40', attackStyle:'fill_cross',   label:'던전의 군주' },
+  boss2:    { tier:2, hp:1200,atk:65, spd:1.4, range:130, warn:150, cd:165, size:32, score:700, col:'#c0f', attackStyle:'fill_scatter', label:'암흑 군주' },
+  boss3:    { tier:3, hp:1600,atk:75, spd:1.5, range:140, warn:145, cd:155, size:34, score:1000,col:'#0af', attackStyle:'fill_ring',    label:'빙하 군주' },
+  boss4:    { tier:4, hp:2200,atk:88, spd:1.6, range:150, warn:140, cd:145, size:36, score:1400,col:'#ff0', attackStyle:'fill_cone',    label:'번개 군주' },
+  boss5:    { tier:5, hp:3000,atk:100,spd:1.7, range:160, warn:135, cd:135, size:38, score:2000,col:'#f00', attackStyle:'fill_scatter', label:'마왕'     },
 };
-const MEMOJI={ goblin:'👺',orc:'👹',shade:'👻',archer:'🏹',mage:'🔮',hunter:'🏃',boss:'👑' };
+
+const MEMOJI={
+  goblin:'👺', skeleton:'💀', slime:'🟢',
+  orc:'👹', archer:'🏹', shade:'👻', berserker:'😡',
+  mage:'🔮', hunter:'🏃', bomber:'💥', vampire:'🧛',
+  golem:'🗿', wraith:'👁', hydra:'🐍',
+  lich:'☠️', dragon:'🐉', demon:'😈',
+  boss:'👑', boss2:'🌑', boss3:'❄️', boss4:'⚡', boss5:'💀',
+};
+
 let nextId=1;
 
+// ── 스테이지별 몬스터 풀 계산 ─────────────────────────
+function getMonsterPool(stg){
+  // 해당 스테이지에서 나올 수 있는 몬스터 목록 + 가중치
+  const pool=[];
+  Object.entries(MTYPE).forEach(([key,cfg])=>{
+    if(key.startsWith('boss')) return; // 보스 제외
+    if(cfg.tier>stg) return;           // 아직 등장 안 함
+    // 낮은 티어일수록 가중치 낮아짐 (희귀도 자연 반영)
+    const tierGap=stg-cfg.tier;
+    const weight=tierGap>=3?1:tierGap===2?3:tierGap===1?6:10;
+    for(let i=0;i<weight;i++) pool.push(key);
+  });
+  return pool.length>0 ? pool : ['goblin'];
+}
+
+// ── 스테이지별 보스 결정 ──────────────────────────────
+function getBossType(stg){
+  if(stg>=5) return 'boss5';
+  if(stg>=4) return 'boss4';
+  if(stg>=3) return 'boss3';
+  if(stg>=2) return 'boss2';
+  return 'boss';
+}
+
+// ── 엘리트 여부 (10% 확률, 스테이지 3+부터) ──────────
+function isElite(stg){ return stg>=3 && Math.random()<0.10; }
+
 function spawnMonster(type){
-  // 랜덤 빈 타일 위치 (보스 방 밖)
+  // 타입 미지정 시 스테이지 풀에서 랜덤 선택
+  if(!type){
+    const pool=getMonsterPool(stage);
+    type=pool[Math.random()*pool.length|0];
+  }
   let x,y,tries=0;
-  const types=['goblin','orc','shade','archer','mage','hunter'];
-  type = type || types[Math.random()*types.length|0];
-  do {
-    x = (1+Math.random()*(COLS-2))*TILE;
-    y = (1+Math.random()*(ROWS-2))*TILE;
+  do{
+    x=(1+Math.random()*(COLS-2))*TILE;
+    y=(1+Math.random()*(ROWS-2))*TILE;
     tries++;
-  } while(
-    (isWall(x,y) ||
-    Math.hypot(x-player.x,y-player.y)<280 ||
-    (x>bossArena.x-100 && y>bossArena.y-100)) && tries<80
+  }while(
+    (isWall(x,y)||
+    Math.hypot(x-player.x,y-player.y)<280||
+    (x>bossArena.x-100&&y>bossArena.y-100))&&tries<80
   );
   if(tries>=80) return;
+
   const cfg=MTYPE[type];
+  if(!cfg) return;
+
+  // 스테이지 기본 강화
   const boost=1+(stage-1)*0.18;
+  // 엘리트 처리
+  const elite=isElite(stage);
+  const eb=elite?1.8:1; // 엘리트 배율
+
   monsters.push({
     id:nextId++, type, x, y,
-    hp:cfg.hp*boost|0, maxHp:cfg.hp*boost|0,
-    atk:cfg.atk*boost|0, spd:cfg.spd*(1+(stage-1)*0.07),
-    range:cfg.range, warn:cfg.warn,
-    cd:cfg.cd, size:cfg.size,
-    score:cfg.score*stage, col:cfg.col,
-    attackStyle:cfg.attackStyle||'fill_circle',
-    attackCd: (Math.random()*cfg.cd)|0,
+    label: cfg.label+(elite?'★':''),
+    elite,
+    hp:   (cfg.hp   *boost*eb)|0,
+    maxHp:(cfg.hp   *boost*eb)|0,
+    atk:  (cfg.atk  *boost*eb)|0,
+    spd:   cfg.spd  *(1+(stage-1)*0.07)*(elite?1.3:1),
+    range: cfg.range,
+    warn:  cfg.warn,
+    cd:    Math.max(55, cfg.cd-(stage-1)*5)|0,
+    size:  cfg.size+(elite?3:0),
+    score: (cfg.score*stage*(elite?3:1))|0,
+    col:   elite?'#ffd700':cfg.col,
+    attackStyle: cfg.attackStyle||'fill_circle',
+    attackCd:(Math.random()*cfg.cd)|0,
     warnPhase:false, alive:true,
     enraged:false, phase:0,
-    aimAngle:0,   // 경고 시작 시 고정된 공격 각도
-    bossPhase:0,  // 보스 페이즈 카운터
+    aimAngle:0, bossPhase:0,
   });
 }
 
 function spawnBoss(){
-  const cfg=MTYPE.boss;
+  const bossType=getBossType(stage);
+  const cfg=MTYPE[bossType];
   const bx=bossArena.x+bossArena.w/2;
   const by=bossArena.y+bossArena.h/2;
-  const boost=1+(stage-1)*0.25;
+  // 보스는 스테이지마다 자체 스탯이 다르므로 boost를 작게
+  const boost=1+(stage-1)*0.15;
   monsters.push({
-    id:nextId++, type:'boss', x:bx, y:by,
-    hp:   cfg.hp  *boost|0,
-    maxHp:cfg.hp  *boost|0,
-    atk:  cfg.atk *boost|0,
-    spd:  cfg.spd *(1+(stage-1)*0.08),
-    range:cfg.range, warn:cfg.warn,
-    cd:Math.max(100,cfg.cd-(stage-1)*15)|0,
-    size:cfg.size+Math.min(stage-1,6),
-    score:cfg.score*stage, col:cfg.col,
+    id:nextId++, type:bossType, x:bx, y:by,
+    label: cfg.label,
+    elite: false,
+    hp:   (cfg.hp  *boost)|0,
+    maxHp:(cfg.hp  *boost)|0,
+    atk:  (cfg.atk *boost)|0,
+    spd:   cfg.spd *(1+(stage-1)*0.06),
+    range: cfg.range, warn:cfg.warn,
+    cd:Math.max(90, cfg.cd-(stage-1)*10)|0,
+    size:  cfg.size+Math.min(stage-1,5),
+    score: (cfg.score*stage)|0,
+    col:   cfg.col,
     attackStyle:cfg.attackStyle,
     attackCd:80, warnPhase:false, alive:true,
     enraged:false, phase:0,
@@ -651,8 +728,9 @@ function spawnBoss(){
   });
   bossSpawned=true;
   screenShake=60;
-  showAlert('👑  던전의 군주 등장!');
-  addLog('👑 던전의 군주가 각성했다!!!','boss');
+  const bossEmoji=MEMOJI[bossType]||'👑';
+  showAlert(`${bossEmoji} ${cfg.label} 등장!`);
+  addLog(`${bossEmoji} ${cfg.label}이(가) 각성했다!!!`,'boss');
   document.getElementById('boss-bar').style.display='block';
 }
 
@@ -721,10 +799,13 @@ function killMonster(m){
     const it=iTypes[Math.random()*iTypes.length|0];
     items.push({x:m.x,y:m.y,type:it,life:600,pulse:0});
   }
-  if(m.type==='boss'){
+  if(m.type&&m.type.startsWith('boss')){
     bossDefeated=true; gameRunning=false;
     totalKills+=kills;
+    const nextBossType=getBossType(stage+1);
+    const nextBossCfg=MTYPE[nextBossType];
     addLog(`🏆 스테이지 ${stage} 보스 처치!`,'win');
+    if(nextBossCfg) addLog(`다음: ${MEMOJI[nextBossType]||'👑'} ${nextBossCfg.label}이(가) 기다린다...`,'boss');
     setTimeout(()=>showStageCleared(),800);
   } else {
     addLog(`${MEMOJI[m.type]} ${m.type} 처치! +${m.score}점`,'kill');
@@ -812,7 +893,7 @@ function update(){
     m.warnPhase = m.attackCd<=m.warn && m.attackCd>0 && d<m.range*2.2;
 
     // 격노
-    if(m.type==='boss'&&!m.enraged&&m.hp<m.maxHp*0.5){
+    if(m.type&&m.type.startsWith('boss')&&!m.enraged&&m.hp<m.maxHp*0.5){
       m.enraged=true; m.cd=(m.cd*0.62)|0;
       addLog('🔥 보스가 격노했습니다!','boss');
     }
@@ -830,7 +911,7 @@ function update(){
       const shielded = shieldActive>0 || player.iframes>0;
 
       // 보스 페이즈마다 패턴 순환
-      if(m.type==='boss'){
+      if(m.type&&m.type.startsWith('boss')){
         m.bossPhase=(m.bossPhase+1)%4;
         const bpat=['fill_cross','fill_scatter','fill_cone','fill_ring'][m.bossPhase];
         m.attackStyle = m.enraged
@@ -1036,7 +1117,7 @@ function update(){
   if(screenShake>0) screenShake--;
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
-  const boss=monsters.find(m=>m.type==='boss'&&m.alive);
+  const boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
   if(tick%6===0){
     const pct=Math.max(0,player.hp/player.maxHp*100);
     document.getElementById('hf0').style.width=pct+'%';
@@ -1407,8 +1488,11 @@ function draw(){
     const spW=sp?sp[0].length*sc:m.size*2;
     ctx.save();
     // 글로우 (경고/격노)
+    if(m.elite&&!m.warnPhase){
+      ctx.shadowColor='#ffd700'; ctx.shadowBlur=12;
+    }
     if(m.warnPhase||m.enraged){
-      ctx.shadowColor=m.enraged?'#f60':m.type==='boss'?'#f80':'#f44';
+      ctx.shadowColor=m.enraged?'#f60':(m.type&&m.type.startsWith('boss'))?'#f80':'#f44';
       ctx.shadowBlur=m.enraged?24:16;
     }
     // 스프라이트
@@ -1419,11 +1503,12 @@ function draw(){
     ctx.fillStyle='#000a'; ctx.fillRect(sx-bw/2-1, sy-spH/2-14, bw+2, 7);
     ctx.fillStyle='#e44'; ctx.fillRect(sx-bw/2, sy-spH/2-13, bw*(m.hp/m.maxHp), 5);
     // 보스 이름
-    if(m.type==='boss'){
+    if(m.type&&m.type.startsWith('boss')){
       ctx.fillStyle=m.enraged?'#f96':'#fda';
       ctx.font='bold 12px Noto Sans KR';
       ctx.textAlign='center'; ctx.textBaseline='bottom';
-      ctx.fillText(m.enraged?'🔥 격노한 던전의 군주':'👑 던전의 군주', sx, sy-spH/2-18);
+      const _ml=m.label||m.type; const _me=MEMOJI[m.type]||'👑';
+      ctx.fillText(m.enraged?`🔥 격노 ${_ml}`:`${_me} ${_ml}`, sx, sy-spH/2-18);
     }
     ctx.restore();
   });
@@ -1825,13 +1910,30 @@ const SP_BOSS = [
 ];
 
 const SP_MAP = {
-  goblin: SP_GOBLIN,
-  orc:    SP_ORC,
-  shade:  SP_SHADE,
-  archer: SP_ARCHER,
-  mage:   SP_MAGE,
-  hunter: SP_HUNTER,
-  boss:   SP_BOSS,
+  // 원본
+  goblin:   SP_GOBLIN,
+  orc:      SP_ORC,
+  shade:    SP_SHADE,
+  archer:   SP_ARCHER,
+  mage:     SP_MAGE,
+  hunter:   SP_HUNTER,
+  boss:     SP_BOSS,
+  // 새 몬스터 → 비슷한 스프라이트 재활용 (색상은 MTYPE.col로)
+  skeleton: SP_SHADE,   // 유령형
+  slime:    SP_GOBLIN,  // 소형
+  berserker:SP_ORC,     // 대형 근접
+  bomber:   SP_HUNTER,  // 중형
+  vampire:  SP_SHADE,   // 빠른 형
+  golem:    SP_BOSS,    // 거대형
+  wraith:   SP_SHADE,   // 빠른 원거리
+  hydra:    SP_ORC,     // 중형 다중
+  lich:     SP_MAGE,    // 마법사형
+  dragon:   SP_BOSS,    // 보스급 일반
+  demon:    SP_ORC,     // 강한 근접
+  boss2:    SP_BOSS,
+  boss3:    SP_BOSS,
+  boss4:    SP_BOSS,
+  boss5:    SP_BOSS,
 };
 // 캐시 키 부여
 SP_PLAYER._cacheKey='player';
@@ -1842,6 +1944,7 @@ SP_ARCHER._cacheKey='archer';
 SP_MAGE._cacheKey='mage';
 SP_HUNTER._cacheKey='hunter';
 SP_BOSS._cacheKey='boss';
+// 새 몬스터 타입은 재활용하므로 별도 키 불필요 (SP_MAP에서 같은 배열 참조)
 
 function drawMonsterSprite(c, m, sx, sy){
   const sp = SP_MAP[m.type];
@@ -1932,9 +2035,14 @@ function showStageCleared(){
   const msg=document.getElementById('end-msg');
   title.style.color='#ffd700';
   title.textContent=`⚔ 스테이지 ${stage} 클리어!`;
+  const nextPool=[...new Set(getMonsterPool(stage+1))].slice(0,6);
+  const nextPreview=nextPool.map(t=>MEMOJI[t]||'?').join(' ');
+  const nextBossT=getBossType(stage+1);
+  const nextBossL=MTYPE[nextBossT]?.label||'???';
   msg.innerHTML=`
     처치: ${kills}마리 &nbsp;|&nbsp; 누적: ${totalKills+kills}마리<br>
-    <span style="color:#aac;font-size:.85rem">다음 스테이지는 더 넓고 강합니다...</span>
+    <span style="font-size:.8rem;color:#aac">다음 스테이지 등장: ${nextPreview}</span><br>
+    <span style="font-size:.8rem;color:#f84">보스: ${MEMOJI[nextBossT]||'👑'} ${nextBossL}</span>
   `;
   // 버튼을 "다음 스테이지"로 변경
   const btn=document.getElementById('retry-btn');
@@ -2391,7 +2499,7 @@ function multiDraw(){
     const bw=Math.max(spW,36);
     ctx.fillStyle='#000a';ctx.fillRect(sxm-bw/2-1,sym-spH/2-14,bw+2,7);
     ctx.fillStyle='#e44';ctx.fillRect(sxm-bw/2,sym-spH/2-13,bw*(m.hp/m.maxHp),5);
-    if(m.type==='boss'){
+    if(m.type&&m.type.startsWith('boss')){
       ctx.fillStyle=m.enraged?'#f96':'#fda';ctx.font='bold 12px Noto Sans KR';
       ctx.textAlign='center';ctx.textBaseline='bottom';
       ctx.fillText(m.enraged?'🔥 격노한 던전의 군주':'👑 던전의 군주',sxm,sym-spH/2-18);
