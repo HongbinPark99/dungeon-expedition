@@ -172,6 +172,101 @@ canvas{display:block;cursor:none;}
 }
 #item-tray .it-title{color:#d4a832;font-weight:700;margin-bottom:5px;font-size:.68rem;}
 .it-row{display:flex;align-items:center;gap:6px;line-height:1.9;}
+
+/* ── 모바일 컨트롤 ── */
+#mobile-controls{
+  display:none; /* 데스크톱에서 숨김 */
+  position:fixed;bottom:0;left:0;right:0;
+  height:200px;z-index:30;pointer-events:none;
+  touch-action:none;
+}
+
+/* 조이스틱 베이스 */
+#joystick-zone{
+  position:absolute;bottom:20px;left:20px;
+  width:140px;height:140px;
+  pointer-events:all;touch-action:none;
+}
+#joystick-base{
+  position:absolute;inset:0;
+  border-radius:50%;
+  background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,255,255,0.2);
+  backdrop-filter:blur(2px);
+}
+#joystick-stick{
+  position:absolute;
+  width:52px;height:52px;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,rgba(255,255,255,0.5),rgba(100,170,255,0.35));
+  border:2px solid rgba(100,180,255,0.6);
+  box-shadow:0 0 14px rgba(68,170,255,0.4);
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  transition:none;
+  pointer-events:none;
+}
+
+/* 오른쪽 버튼들 */
+#action-buttons{
+  position:absolute;bottom:20px;right:20px;
+  display:flex;flex-direction:column;gap:10px;align-items:flex-end;
+  pointer-events:all;touch-action:none;
+}
+.action-row{
+  display:flex;gap:10px;align-items:center;
+}
+
+/* 공격 버튼 (큰 것) */
+#btn-attack{
+  width:76px;height:76px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#6699ff,#2244aa);
+  border:3px solid #88aaff;
+  box-shadow:0 0 20px rgba(68,136,255,0.5);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.6rem;color:#fff;
+  user-select:none;-webkit-user-select:none;
+  active:opacity:.7;
+}
+#btn-attack:active{ transform:scale(0.92); opacity:.8; }
+
+/* 스킬 버튼들 */
+.m-skill-btn{
+  width:52px;height:52px;border-radius:50%;
+  background:rgba(20,25,50,0.85);
+  border:2px solid rgba(80,100,160,0.7);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:1.1rem;color:#ccd;
+  user-select:none;-webkit-user-select:none;
+  position:relative;
+}
+.m-skill-btn:active{ transform:scale(0.9); opacity:.7; }
+.m-skill-btn .m-cd{
+  position:absolute;bottom:1px;
+  font-size:.45rem;color:#aac;
+}
+.m-skill-btn.m-ready{ border-color:#44aaff; box-shadow:0 0 8px #44aaff55; }
+
+/* 조준 오버레이 (우측 절반) */
+#aim-zone{
+  position:absolute;top:0;right:0;
+  width:55%;height:100%;
+  pointer-events:all;touch-action:none;
+  /* background:rgba(255,0,0,0.05); /* 디버그용 */
+}
+
+@media (pointer:coarse) and (max-width:900px){
+  #mobile-controls{ display:block; }
+  /* 모바일에서 HUD 크기 조정 */
+  #hud{ padding:6px 8px; gap:6px; }
+  .p-card{ min-width:100px; padding:5px 8px; }
+  #hint{ display:none; } /* 키보드 힌트 숨김 */
+  #item-tray{ top:auto;bottom:210px;left:8px; }
+  #skill-bar{ bottom:210px; }
+  #weapon-hud{ bottom:210px; }
+  #mm-wrap{ bottom:210px;right:8px; }
+  #log{ bottom:210px; }
+}
 </style>
 </head>
 <body>
@@ -259,6 +354,36 @@ canvas{display:block;cursor:none;}
     <p id="end-msg"></p>
     <button id="retry-btn">다시 도전</button>
   </div>
+
+<!-- 모바일 컨트롤 -->
+<div id="mobile-controls">
+  <!-- 조이스틱 -->
+  <div id="joystick-zone">
+    <div id="joystick-base"></div>
+    <div id="joystick-stick"></div>
+  </div>
+
+  <!-- 조준 영역 (우측) -->
+  <div id="aim-zone"></div>
+
+  <!-- 액션 버튼들 -->
+  <div id="action-buttons">
+    <div class="action-row">
+      <div class="m-skill-btn m-ready" id="m-thunder" data-skill="thunder">
+        <span>⚡</span><span class="m-cd" id="m-cd-thunder">준비</span>
+      </div>
+      <div class="m-skill-btn m-ready" id="m-shield" data-skill="shield">
+        <span>🛡</span><span class="m-cd" id="m-cd-shield">준비</span>
+      </div>
+      <div class="m-skill-btn m-ready" id="m-bomb" data-skill="bomb">
+        <span>💣</span><span class="m-cd" id="m-cd-bomb">준비</span>
+      </div>
+    </div>
+    <div class="action-row">
+      <div id="btn-attack">🔫</div>
+    </div>
+  </div>
+</div>
 </div>
 
 <script>
@@ -599,6 +724,173 @@ function addMuteButton(){
 
 
 
+// ═══════════════════════════════════════════════════════
+//  모바일 컨트롤
+// ═══════════════════════════════════════════════════════
+let isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+let mobileActive = false;
+
+// 조이스틱 상태
+const joyState = { dx:0, dy:0, active:false, id:-1 };
+const aimState  = { x:0, y:0, active:false, id:-1 };
+
+function initMobileControls(){
+  if(!isMobile) return;
+  mobileActive = true;
+  const mc = document.getElementById('mobile-controls');
+  if(mc) mc.style.display = 'block';
+
+  // ── 조이스틱 ──────────────────────────────────────
+  const jZone = document.getElementById('joystick-zone');
+  const stick  = document.getElementById('joystick-stick');
+  const BASE_R = 65; // 조이스틱 반지름
+
+  function joyMove(cx, cy, ox, oy){
+    let dx = cx - ox, dy = cy - oy;
+    const dist = Math.hypot(dx, dy);
+    if(dist > BASE_R){ dx *= BASE_R/dist; dy *= BASE_R/dist; }
+    stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    joyState.dx = dx / BASE_R;
+    joyState.dy = dy / BASE_R;
+  }
+
+  jZone.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const r = jZone.getBoundingClientRect();
+    joyState.id = t.identifier;
+    joyState.active = true;
+    joyMove(t.clientX, t.clientY, r.left + r.width/2, r.top + r.height/2);
+  },{passive:false});
+
+  jZone.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier !== joyState.id) continue;
+      const r = jZone.getBoundingClientRect();
+      joyMove(t.clientX, t.clientY, r.left + r.width/2, r.top + r.height/2);
+      // 이동 방향으로 facing 업데이트
+      if(player && (joyState.dx||joyState.dy))
+        player.facing = Math.atan2(joyState.dy, joyState.dx);
+    }
+  },{passive:false});
+
+  function joyEnd(e){
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier !== joyState.id) continue;
+      joyState.dx = 0; joyState.dy = 0;
+      joyState.active = false; joyState.id = -1;
+      stick.style.transform = 'translate(-50%, -50%)';
+    }
+  }
+  jZone.addEventListener('touchend',   joyEnd, {passive:false});
+  jZone.addEventListener('touchcancel',joyEnd, {passive:false});
+
+  // ── 조준 (우측 드래그) ──────────────────────────────
+  const aimZone = document.getElementById('aim-zone');
+  aimZone.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    aimState.id = t.identifier;
+    aimState.active = true;
+    aimState.startX = t.clientX;
+    aimState.startY = t.clientY;
+    aimState.x = t.clientX;
+    aimState.y = t.clientY;
+  },{passive:false});
+
+  aimZone.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    for(const t of e.changedTouches){
+      if(t.identifier !== aimState.id) continue;
+      aimState.x = t.clientX;
+      aimState.y = t.clientY;
+      // 드래그 방향으로 조준
+      if(player && player.alive){
+        const ddx = t.clientX - aimState.startX;
+        const ddy = t.clientY - aimState.startY;
+        if(Math.hypot(ddx, ddy) > 8)
+          player.facing = Math.atan2(ddy, ddx);
+        // 크로스헤어도 실제 화면 위치로
+        mouse.x = t.clientX;
+        mouse.y = t.clientY;
+      }
+    }
+  },{passive:false});
+
+  function aimEnd(e){
+    e.preventDefault();
+    for(const t of e.changedTouches)
+      if(t.identifier===aimState.id){ aimState.active=false; aimState.id=-1; }
+  }
+  aimZone.addEventListener('touchend',   aimEnd, {passive:false});
+  aimZone.addEventListener('touchcancel',aimEnd, {passive:false});
+
+  // ── 공격 버튼 ────────────────────────────────────────
+  const btnAtk = document.getElementById('btn-attack');
+  btnAtk.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    if(gameRunning && player && player.alive) doAttack();
+  },{passive:false});
+  // 홀드 연사
+  let atkInterval = null;
+  btnAtk.addEventListener('touchstart', e=>{
+    atkInterval = setInterval(()=>{ if(gameRunning&&player&&player.alive) doAttack(); }, 80);
+  },{passive:false});
+  btnAtk.addEventListener('touchend',   ()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
+  btnAtk.addEventListener('touchcancel',()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
+
+  // ── 스킬 버튼들 ──────────────────────────────────────
+  document.getElementById('m-bomb').addEventListener('touchstart', e=>{
+    e.preventDefault(); doSkillBomb();
+  },{passive:false});
+  document.getElementById('m-shield').addEventListener('touchstart', e=>{
+    e.preventDefault(); doSkillShield();
+  },{passive:false});
+  document.getElementById('m-thunder').addEventListener('touchstart', e=>{
+    e.preventDefault(); doSkillThunder();
+  },{passive:false});
+}
+
+// 조이스틱 입력을 키보드 입력에 합산
+function getMobileInput(){
+  if(!mobileActive || !joyState.active) return {up:false,down:false,left:false,right:false};
+  const deadzone = 0.25;
+  return {
+    up:    joyState.dy < -deadzone,
+    down:  joyState.dy >  deadzone,
+    left:  joyState.dx < -deadzone,
+    right: joyState.dx >  deadzone,
+  };
+}
+
+// 모바일 쿨다운 HUD 업데이트
+function updateMobileSkillHUD(){
+  if(!mobileActive) return;
+  const skills = [
+    {id:'m-bomb',    cdId:'m-cd-bomb',    cd:skillCd.bomb,    max:CD_BOMB},
+    {id:'m-shield',  cdId:'m-cd-shield',  cd:skillCd.shield,  max:CD_SHIELD},
+    {id:'m-thunder', cdId:'m-cd-thunder', cd:skillCd.thunder, max:CD_THUNDER},
+  ];
+  skills.forEach(s=>{
+    const el  = document.getElementById(s.id);
+    const cdEl= document.getElementById(s.cdId);
+    if(!el||!cdEl) return;
+    if(s.cd<=0){
+      el.className='m-skill-btn m-ready';
+      cdEl.textContent='준비';
+    } else {
+      el.className='m-skill-btn';
+      cdEl.textContent=(s.cd/60).toFixed(1)+'s';
+    }
+  });
+  // 공격 버튼 무기 아이콘
+  const wp = WEAPONS&&WEAPONS[player&&player.weapon]||{emoji:'🔫'};
+  const ba = document.getElementById('btn-attack');
+  if(ba) ba.textContent = wp.emoji||'🔫';
+}
+
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
 const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
@@ -687,6 +979,7 @@ function initGame(keepStage=false){
   if(stage===1){
     startBGM(); setBGMStage(stage); addMuteButton();
   updateWeaponHUD();
+  if(isMobile&&!mobileActive) initMobileControls();
   addLog('⚔ 던전 탐험을 시작합니다!','win');
     addLog('보스 방을 찾아 던전의 군주를 처치하라!');
   } else {
@@ -1010,6 +1303,14 @@ function update(){
     if(keys['ArrowDown'] ||keys['s']||keys['S']) dy+=1;
     if(keys['ArrowLeft'] ||keys['a']||keys['A']) dx-=1;
     if(keys['ArrowRight']||keys['d']||keys['D']) dx+=1;
+    // 조이스틱 입력 합산
+    if(mobileActive&&joyState.active){
+      const mi=getMobileInput();
+      if(mi.up) dy-=1; if(mi.down) dy+=1;
+      if(mi.left) dx-=1; if(mi.right) dx+=1;
+      // 연속값으로 더 부드럽게
+      if(!dx&&!dy){ dx=joyState.dx; dy=joyState.dy; }
+    }
     if(dx||dy){
       const len=Math.hypot(dx,dy);
       // facing은 마우스가 움직였을 때 이미 업데이트됨 — 이동방향으론 덮지 않음
@@ -1298,6 +1599,7 @@ function update(){
   if(screenShake>0) screenShake--;
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
+  if(tick%6===0) updateMobileSkillHUD();
   const boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
   if(tick%6===0){
     const pct=Math.max(0,player.hp/player.maxHp*100);
