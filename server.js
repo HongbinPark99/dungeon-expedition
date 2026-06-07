@@ -126,7 +126,8 @@ function startGame(room) {
   // 플레이어 위치 초기화
   const startRoom = room.rooms_data[0];
   Object.values(room.players).forEach((p,i) => {
-    p.x = startRoom.cx*TILE + (i-1)*40;
+    // 싱글과 동일하게 첫 번째 방 중앙에서 시작, 간격 40px
+    p.x = startRoom.cx*TILE + (i * 40);
     p.y = startRoom.cy*TILE;
     p.hp=120; p.maxHp=120; p.alive=true; p.iframes=0; p.shieldActive=0; p.score=0;
   });
