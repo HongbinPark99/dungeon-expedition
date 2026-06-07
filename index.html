@@ -379,16 +379,38 @@ canvas{display:block;cursor:none;}
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;
     background:#0b0d1e;border:1px solid #2a2d50;border-radius:12px;padding:18px 28px;">
     <div style="font-family:'Black Han Sans',sans-serif;font-size:.9rem;color:#d4a832;letter-spacing:2px">🌐 멀티플레이어 (최대 3인)</div>
-    <input id="server-url" placeholder="wss://your-app.onrender.com"
+    <input id="server-url" placeholder="wss://dungeon-expedition.onrender.com"
       style="background:#0d0f20;border:1px solid #3a3d60;border-radius:8px;
       padding:8px 14px;color:#eee;font-size:.82rem;font-family:inherit;
       text-align:center;width:280px;"/>
-    <button id="multi-btn" style="background:linear-gradient(135deg,#2a6,#4b8);
-      color:#fff;border:none;border-radius:8px;padding:10px 28px;
-      font-family:'Black Han Sans',sans-serif;font-size:1rem;letter-spacing:2px;
-      cursor:pointer;box-shadow:0 2px 16px #2a644444;">
-      서버 접속하기
-    </button>
+
+    <!-- 방 만들기 -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="room-name-input" placeholder="방 이름 (선택)" maxlength="16"
+        style="background:#0d0f20;border:1px solid #3a3d60;border-radius:8px;
+        padding:7px 12px;color:#eee;font-size:.8rem;font-family:inherit;width:160px;"/>
+      <button id="create-room-btn" style="background:linear-gradient(135deg,#d4a832,#f0c84a);
+        color:#111;border:none;border-radius:8px;padding:8px 18px;
+        font-family:'Black Han Sans',sans-serif;font-size:.85rem;letter-spacing:1px;
+        cursor:pointer;white-space:nowrap;">
+        🏠 방 만들기
+      </button>
+    </div>
+
+    <!-- 방 목록 -->
+    <div style="width:100%;max-width:320px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:.72rem;color:#667;">방 목록</span>
+        <button id="refresh-rooms-btn" style="background:#1a1d30;border:1px solid #2a2d50;
+          border-radius:6px;color:#99b;font-size:.68rem;padding:3px 10px;cursor:pointer;">
+          새로고침
+        </button>
+      </div>
+      <div id="room-list" style="display:flex;flex-direction:column;gap:6px;min-height:40px;">
+        <div style="font-size:.68rem;color:#445;text-align:center;padding:10px;">서버 URL 입력 후 새로고침</div>
+      </div>
+    </div>
+
     <div id="multi-status" style="font-size:.7rem;color:#5a8;min-height:1.2em;"></div>
   </div>
 </div>
@@ -3683,7 +3705,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else buildCharSelectUI();
 document.getElementById('retry-btn').addEventListener('click',()=>{
   document.getElementById('ending').style.display='none';
-  if(multiMode) connectMulti(currentServerUrl);
+  if(multiMode) connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
   else initGame(false);
 });
 document.getElementById('game').addEventListener('click',()=>canvas.focus());
@@ -3692,50 +3714,100 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 //  멀티플레이어
 // ══════════════════════════════════════════════════════
 let multiMode=false, multiWs=null, currentServerUrl='';
-let multiState=null; // 서버로부터 받은 게임 상태
+let multiState=null;
 let myMultiId=null, myColorIdx=0;
 
-document.getElementById('multi-btn').addEventListener('click',()=>{
-  window.playerNickname = (document.getElementById('nickname-input').value.trim()) || '용사';
-  const url=document.getElementById('server-url').value.trim();
+function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
+function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
+function getServerUrl(){
+  const raw=(document.getElementById('server-url').value.trim());
+  // https→wss, http→ws 자동 변환
+  return raw.replace(/^https:/,'wss:').replace(/^http:/,'ws:');
+}
+
+// ── 방 목록 새로고침 ──────────────────────────────────
+async function fetchRooms(){
+  const raw=document.getElementById('server-url').value.trim();
+  if(!raw){ setMultiStatus('❌ 서버 URL을 먼저 입력하세요'); return; }
+  const httpUrl=raw.replace(/^wss:/,'https:').replace(/^ws:/,'http:')+'/rooms';
+  try{
+    setMultiStatus('방 목록 불러오는 중...');
+    const res=await fetch(httpUrl);
+    const list=await res.json();
+    renderRoomList(list);
+    setMultiStatus(list.length===0?'현재 열린 방이 없습니다':'');
+  }catch(e){
+    setMultiStatus('❌ 서버 연결 실패. URL을 확인하세요.');
+    renderRoomList([]);
+  }
+}
+
+function renderRoomList(list){
+  const el=document.getElementById('room-list');
+  if(list.length===0){
+    el.innerHTML='<div style="font-size:.68rem;color:#445;text-align:center;padding:10px;">열린 방이 없습니다. 방을 만들어 보세요!</div>';
+    return;
+  }
+  el.innerHTML=list.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      background:#0d0f20;border:1px solid #2a2d50;border-radius:8px;padding:8px 12px;">
+      <div>
+        <span style="color:#d4a832;font-size:.8rem;font-weight:700;">${r.name}</span>
+        <span style="color:#556;font-size:.65rem;margin-left:8px;">${r.players}/${r.max}명</span>
+      </div>
+      ${r.players>=r.max
+        ? '<span style="font-size:.65rem;color:#f44;">방 가득참</span>'
+        : `<button onclick="joinRoom('${r.id}')"
+            style="background:linear-gradient(135deg,#2a6,#4b8);color:#fff;border:none;
+            border-radius:6px;padding:5px 14px;font-size:.75rem;cursor:pointer;">참여</button>`
+      }
+    </div>
+  `).join('');
+}
+
+document.getElementById('refresh-rooms-btn').addEventListener('click', fetchRooms);
+
+// ── 방 만들기 ─────────────────────────────────────────
+document.getElementById('create-room-btn').addEventListener('click',()=>{
+  window.playerNickname=getNickname();
+  const url=getServerUrl();
   if(!url){ setMultiStatus('❌ 서버 URL을 입력해주세요'); return; }
-  connectMulti(url);
+  const roomName=(document.getElementById('room-name-input').value.trim())||`${window.playerNickname}의 방`;
+  connectMultiWs(url, {type:'create_room', name:window.playerNickname, roomName});
 });
 
-function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
+// ── 방 참여 ───────────────────────────────────────────
+function joinRoom(roomId){
+  window.playerNickname=getNickname();
+  const url=getServerUrl();
+  if(!url){ setMultiStatus('❌ 서버 URL을 입력해주세요'); return; }
+  connectMultiWs(url, {type:'join_room', roomId, name:window.playerNickname});
+}
 
-function connectMulti(url){
+// ── WebSocket 연결 ────────────────────────────────────
+function connectMultiWs(url, joinMsg){
   currentServerUrl=url;
   setMultiStatus('접속 중...');
   if(multiWs){ try{multiWs.close();}catch(e){} }
-
   multiWs=new WebSocket(url);
-
-  multiWs.onopen=()=>setMultiStatus('연결됨! 대기중...');
-  multiWs.onerror=()=>setMultiStatus('❌ 연결 실패. URL을 확인해주세요.');
-  multiWs.onclose=()=>{
-    if(multiMode) setMultiStatus('연결 끊김');
-    multiMode=false;
+  multiWs.onopen=()=>{
+    setMultiStatus('연결됨! 방 입장 중...');
+    multiWs.send(JSON.stringify(joinMsg));
   };
-
+  multiWs.onerror=()=>setMultiStatus('❌ 연결 실패. URL을 확인해주세요.');
+  multiWs.onclose=()=>{ if(multiMode) setMultiStatus('연결 끊김'); multiMode=false; };
   multiWs.onmessage=(e)=>{
     const msg=JSON.parse(e.data);
-
-    if(msg.type==='full'){
-      setMultiStatus('❌ 방이 가득 찼습니다 (최대 3인)');
-      multiWs.close(); return;
-    }
+    if(msg.type==='full'){ setMultiStatus('❌ 방이 가득 찼습니다 (최대 3인)'); multiWs.close(); return; }
+    if(msg.type==='error'){ setMultiStatus('❌ '+msg.msg); return; }
 
     if(msg.type==='init'){
       myMultiId=msg.pid;
       myColorIdx=msg.colorIdx;
       multiMode=true;
-      // 닉네임 서버에 전송
-      if(multiWs&&multiWs.readyState===1){
-        multiWs.send(JSON.stringify({type:'name', name:window.playerNickname||'용사'}));
-      }
+      window._lastRoomId=msg.roomId;
+      setMultiStatus(`✅ "${msg.roomName||msg.name}" 입장 완료!`);
 
-      // 멀티용 맵 타일 설정
       tiles=new Uint8Array(msg.tiles);
       explored=new Uint8Array(COLS*ROWS);
       mapW=msg.mapW; mapH=msg.mapH;
@@ -3744,9 +3816,7 @@ function connectMulti(url){
       document.getElementById('lobby').style.display='none';
       document.getElementById('game').style.display='block';
       document.getElementById('ending').style.display='none';
-      setMultiStatus(`접속 완료! (${msg.name})`);
 
-      // HUD 업데이트
       updateMultiHUD([]);
       if(!rafId) loop();
       return;
@@ -3754,13 +3824,12 @@ function connectMulti(url){
 
     if(msg.type==='state'){
       multiState=msg;
-      // fog 업데이트
       msg.players.forEach(p=>{
         if(!explored) return;
         const r=Math.ceil(SIGHT_R/TILE)+1;
         const cx=p.x/TILE|0, cy=p.y/TILE|0;
         for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){
-          const c=cx+dx,rr=cy+dy;
+          const c=cx+dx, rr=cy+dy;
           if(c>=0&&c<COLS&&rr>=0&&rr<ROWS) explored[rr*COLS+c]=1;
         }
       });
@@ -3771,16 +3840,11 @@ function connectMulti(url){
     if(msg.type==='boss_spawn') showAlert('👑 보스 등장!');
     if(msg.type==='game_won') showEnding(true);
     if(msg.type==='game_over') showEnding(false);
-
+    if(msg.type==='stage_clear') showAlert(`🎉 스테이지 ${msg.stage-1} 클리어!`);
     if(msg.type==='player_join') addLog(`✅ ${msg.name} 입장 (${msg.count}/3명)`);
     if(msg.type==='player_leave') addLog(`🚪 ${msg.name} 퇴장 (${msg.count}/3명)`);
-
-    if(msg.type==='attack_fx'){
-      attackFx.push({x:msg.x,y:msg.y,r:68,life:14,pid:msg.pid});
-    }
-    if(msg.type==='thunder_fx'){
-      dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
-    }
+    if(msg.type==='attack_fx') attackFx.push({x:msg.x,y:msg.y,r:68,life:14,pid:msg.pid});
+    if(msg.type==='thunder_fx') dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
   };
 }
 
