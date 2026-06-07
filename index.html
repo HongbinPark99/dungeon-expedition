@@ -761,7 +761,7 @@ function _getACtx(){
   return _audioCtx;
 }
 function _tone(freq,type,dur,vol,detune,delay){
-  vol=(vol||0.25)*0.45; // 볼륨 감소detune=detune||0;delay=delay||0;
+  vol=(vol||0.25)*0.45*(multiMode?0.35:1.0); // 볼륨 감소 (멀티 추가 감소)detune=detune||0;delay=delay||0;
   if(_sfxMuted)return;
   try{
     const ac=_getACtx(),o=ac.createOscillator(),g=ac.createGain();
@@ -773,7 +773,7 @@ function _tone(freq,type,dur,vol,detune,delay){
   }catch(e){}
 }
 function _noise(dur,vol,hi,delay){
-  vol=(vol||0.15)*0.45; // 볼륨 감소hi=hi||800;delay=delay||0;
+  vol=(vol||0.15)*0.45*(multiMode?0.35:1.0); // 볼륨 감소 (멀티 추가 감소)hi=hi||800;delay=delay||0;
   if(_sfxMuted)return;
   try{
     const ac=_getACtx(),sz=ac.sampleRate*dur|0;
@@ -1306,9 +1306,9 @@ canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); doSkillBomb(); })
 document.addEventListener('keydown',e=>{
   keys[e.key]=true;
   if(e.key===' '){e.preventDefault(); doAttack();}
-  if(e.key==='1') doSkillBomb();
-  if(e.key==='2') doSkillShield();
-  if(e.key==='3') doSkillThunder();
+  if(e.key==='1'){e.preventDefault(); doSkillBomb();}
+  if(e.key==='2'){e.preventDefault(); doSkillShield();}
+  if(e.key==='3'){e.preventDefault(); doSkillThunder();}
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
 });
 document.addEventListener('keyup',e=>{ keys[e.key]=false; });
@@ -1552,9 +1552,13 @@ function spawnBoss(){
 // ═══════════════════════════════════════════════════════
 function doAttack(){
   if(multiMode){
+    const now=Date.now();
+    if(!window._multiLastAttack) window._multiLastAttack=0;
+    if(now-window._multiLastAttack < 400) return; // 싱글 sword cd(36frames≈600ms)에 맞춤
+    window._multiLastAttack=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'attack'}));
-      SFX.shoot(); // 사운드
+      SFX.shoot();
     }
     return;
   }
@@ -1584,6 +1588,10 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
+    const now=Date.now();
+    if(!window._multiLastBomb) window._multiLastBomb=0;
+    if(now-window._multiLastBomb < 6000) return; // CD_BOMB=360프레임=6초
+    window._multiLastBomb=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'bomb'}));
       SFX.explode();
@@ -1605,6 +1613,10 @@ function doSkillBomb(){
 
 function doSkillShield(){
   if(multiMode){
+    const now=Date.now();
+    if(!window._multiLastShield) window._multiLastShield=0;
+    if(now-window._multiLastShield < 8000) return; // CD_SHIELD=480프레임=8초
+    window._multiLastShield=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'shield'}));
       SFX.shield();
@@ -1620,6 +1632,10 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
+    const now=Date.now();
+    if(!window._multiLastThunder) window._multiLastThunder=0;
+    if(now-window._multiLastThunder < 5000) return; // CD_THUNDER=300프레임=5초
+    window._multiLastThunder=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'thunder'}));
       SFX.thunder&&SFX.thunder();
@@ -3919,6 +3935,8 @@ function connectMultiWs(url, joinMsg){
       // charId 맵 초기화 + 내 캐릭터 등록
       window._charIdMap = window._charIdMap || {};
       window._multiCamInit = false;
+      window._multiLastAttack=0; window._multiLastBomb=0;
+      window._multiLastShield=0; window._multiLastThunder=0;
       window._charIdMap[msg.pid] = msg.charId || selectedChar || 'photo0';
 
       // 맵 데이터 미리 저장
@@ -3942,6 +3960,8 @@ function connectMultiWs(url, joinMsg){
       // 모든 플레이어 charId 맵 업데이트
       window._charIdMap = window._charIdMap || {};
       window._multiCamInit = false;
+      window._multiLastAttack=0; window._multiLastBomb=0;
+      window._multiLastShield=0; window._multiLastThunder=0;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       renderWaitingPlayers(msg.players, msg.hostId);
       renderWaitingHostArea(msg.hostId===myMultiId);
@@ -3975,8 +3995,11 @@ function connectMultiWs(url, joinMsg){
       window._fog2=null; window._fog2C=null;
       window._charIdMap = window._charIdMap || {};
       window._multiCamInit = false;
+      window._multiLastAttack=0; window._multiLastBomb=0;
+      window._multiLastShield=0; window._multiLastThunder=0;
       // BGM 시작 (싱글과 동일)
       startBGM(); setBGMStage(1);
+      if(_bgmGain) _bgmGain.gain.value=0.008; // 멀티 BGM 낮게
       addMuteButton();
       // HUD 세팅
       updateMultiHUD([]);
@@ -3992,6 +4015,8 @@ function connectMultiWs(url, joinMsg){
       // charId 맵 갱신
       window._charIdMap = window._charIdMap || {};
       window._multiCamInit = false;
+      window._multiLastAttack=0; window._multiLastBomb=0;
+      window._multiLastShield=0; window._multiLastThunder=0;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       // 첫 state 수신 시 카메라 즉시 점프
       if(!window._multiCamInit){
