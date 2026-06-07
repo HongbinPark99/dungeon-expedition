@@ -1105,6 +1105,16 @@ function applySelectedChar(){
 }
 
 
+// ── hex → rgba 변환 헬퍼 (addColorStop 호환성) ──
+function hex2rgba(hex, alpha){
+  hex=hex.replace('#','');
+  if(hex.length===3) hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+  const r=parseInt(hex.slice(0,2),16);
+  const g=parseInt(hex.slice(2,4),16);
+  const b=parseInt(hex.slice(4,6),16);
+  return 'rgba('+r+','+g+','+b+','+alpha+')';
+}
+
 // ── 임베드 사진 데이터 ──────────────────────────────
 const PHOTO_B64 = {
   'photo_ferris': 'data:image/jpeg;base64,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',
@@ -2753,7 +2763,7 @@ function drawCharTallHero(c,x,y,sz,facing,t,elite){
 // ── 실사 피부 그라디언트 ─────────────────────────────
 function skinGrad(c, cx, cy, r, light, dark){
   const g=c.createRadialGradient(cx-r*0.25,cy-r*0.3,r*0.05, cx,cy,r*1.1);
-  g.addColorStop(0,light); g.addColorStop(0.6,dark); g.addColorStop(1,dark+'cc');
+  g.addColorStop(0,light); g.addColorStop(0.6,dark); g.addColorStop(1,hex2rgba(dark,0.6));
   return g;
 }
 
@@ -2772,7 +2782,7 @@ function realisticEye(c, cx, cy, w, h, iris, pupil, facing, brow){
   c.fillStyle=wg; c.fill();
   // 홍채
   const ig=c.createRadialGradient(cx+w*0.08,cy-h*0.1,0,cx,cy,h*1.1);
-  ig.addColorStop(0,iris+'ee'); ig.addColorStop(0.5,iris); ig.addColorStop(1,'#0a0808');
+  ig.addColorStop(0,hex2rgba(iris,0.93)); ig.addColorStop(0.5,iris); ig.addColorStop(1,'#0a0808');
   c.beginPath(); c.arc(cx,cy,h*0.95,0,Math.PI*2); c.fillStyle=ig; c.fill();
   // 동공
   c.beginPath(); c.arc(cx,cy,h*0.48,0,Math.PI*2); c.fillStyle='#050303'; c.fill();
@@ -2820,7 +2830,7 @@ function realisticNose(c, cx, cy, w, h, skin){
   c.strokeStyle='rgba(0,0,0,0.12)'; c.lineWidth=w*0.25; c.lineCap='round'; c.stroke();
   // 코끝
   const ng=c.createRadialGradient(cx,cy+h*0.3,0,cx,cy+h*0.3,w*0.6);
-  ng.addColorStop(0,skin); ng.addColorStop(1,skin+'88');
+  ng.addColorStop(0,skin); ng.addColorStop(1,hex2rgba(skin,0.53));
   c.beginPath(); c.ellipse(cx,cy+h*0.35,w*0.55,h*0.38,0,0,Math.PI*2); c.fillStyle=ng; c.fill();
   // 콧구멍
   [-1,1].forEach(s=>{
