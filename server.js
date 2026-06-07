@@ -222,7 +222,7 @@ function gameTick(room) {
     type:'state',
     players:ps.map(p=>({id:p.id,name:p.name,x:p.x,y:p.y,hp:p.hp,maxHp:p.maxHp,
       alive:p.alive,iframes:p.iframes,shieldActive:p.shieldActive,
-      facing:p.facing,colorIdx:p.colorIdx,score:p.score})),
+      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0'})),
     monsters:Object.values(room.monsters).filter(m=>m.alive).map(m=>({
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
@@ -262,7 +262,8 @@ wss.on('connection', ws => {
       const ci=0;
       room.players[pid]={ id:pid, name:msg.name||'용사', ws,
         x:0,y:0,hp:120,maxHp:120,alive:true,iframes:0,shieldActive:0,
-        facing:0,input:{},colorIdx:ci,score:0 };
+        facing:0,input:{},colorIdx:ci,score:0,
+        charId:msg.charId||'photo0' };
       room.hostId=pid;
       playerRoom=room;
       // init 전송 (맵 정보 포함 - 대기실에서 미리 수신)
@@ -270,7 +271,7 @@ wss.on('connection', ws => {
         type:'init', pid, colorIdx:ci, roomId:room.id, roomName:room.name,
         tiles:Array.from(room.tiles), mapW:MAP_W, mapH:MAP_H,
         bossArena:room.bossArena, rooms:room.rooms_data,
-        isHost:true,
+        isHost:true, charId:msg.charId||'photo0',
       }));
       broadcastWaiting(room); return;
     }
@@ -285,13 +286,14 @@ wss.on('connection', ws => {
       const ci=Object.keys(room.players).length%COLORS.length;
       room.players[pid]={ id:pid, name:msg.name||'용사', ws,
         x:0,y:0,hp:120,maxHp:120,alive:true,iframes:0,shieldActive:0,
-        facing:0,input:{},colorIdx:ci,score:0 };
+        facing:0,input:{},colorIdx:ci,score:0,
+        charId:msg.charId||'photo0' };
       playerRoom=room;
       ws.send(JSON.stringify({
         type:'init', pid, colorIdx:ci, roomId:room.id, roomName:room.name,
         tiles:Array.from(room.tiles), mapW:MAP_W, mapH:MAP_H,
         bossArena:room.bossArena, rooms:room.rooms_data,
-        isHost:false,
+        isHost:false, charId:msg.charId||'photo0',
       }));
       broadcastWaiting(room); return;
     }
