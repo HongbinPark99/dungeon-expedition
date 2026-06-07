@@ -1292,11 +1292,13 @@ canvas.addEventListener('mousemove',e=>{
 canvas.addEventListener('mousemove', e=>{
   if(!multiMode) return;
   const rect=canvas.getBoundingClientRect();
+  // mouse 객체도 업데이트 (크로스헤어용)
+  mouse.x=e.clientX-rect.left;
+  mouse.y=e.clientY-rect.top;
   const me=multiState&&multiState.players&&multiState.players.find(p=>p.id===myMultiId);
   if(!me) return;
-  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
   const sx=me.x-camX, sy=me.y-camY;
-  window._multiMouseAngle=Math.atan2(my-sy, mx-sx);
+  window._multiMouseAngle=Math.atan2(mouse.y-sy, mouse.x-sx);
 });
 
 canvas.addEventListener('mousedown',e=>{
@@ -1556,7 +1558,10 @@ function spawnBoss(){
 // ═══════════════════════════════════════════════════════
 function doAttack(){
   if(multiMode){
-    if(multiWs&&multiWs.readyState===1) multiWs.send(JSON.stringify({type:'attack'}));
+    if(multiWs&&multiWs.readyState===1){
+      multiWs.send(JSON.stringify({type:'attack'}));
+      SFX.shoot(); // 사운드
+    }
     return;
   }
   if(!gameRunning||!player.alive||player.attackCd>0) return;
@@ -1585,7 +1590,10 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
-    if(multiWs&&multiWs.readyState===1) multiWs.send(JSON.stringify({type:'bomb'}));
+    if(multiWs&&multiWs.readyState===1){
+      multiWs.send(JSON.stringify({type:'bomb'}));
+      SFX.explode();
+    }
     return;
   }
   if(!gameRunning||!player.alive||skillCd.bomb>0) return;
@@ -1603,7 +1611,10 @@ function doSkillBomb(){
 
 function doSkillShield(){
   if(multiMode){
-    if(multiWs&&multiWs.readyState===1) multiWs.send(JSON.stringify({type:'shield'}));
+    if(multiWs&&multiWs.readyState===1){
+      multiWs.send(JSON.stringify({type:'shield'}));
+      SFX.shield();
+    }
     return;
   }
   if(!gameRunning||!player.alive||skillCd.shield>0) return;
@@ -1615,7 +1626,10 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
-    if(multiWs&&multiWs.readyState===1) multiWs.send(JSON.stringify({type:'thunder'}));
+    if(multiWs&&multiWs.readyState===1){
+      multiWs.send(JSON.stringify({type:'thunder'}));
+      SFX.thunder&&SFX.thunder();
+    }
     return;
   }
   if(!gameRunning||!player.alive||skillCd.thunder>0) return;
@@ -3911,6 +3925,7 @@ function connectMultiWs(url, joinMsg){
       window._isHost=msg.isHost;
       // charId 맵 초기화 + 내 캐릭터 등록
       window._charIdMap = window._charIdMap || {};
+      window._multiCamInit = false;
       window._charIdMap[msg.pid] = msg.charId || selectedChar || 'photo0';
 
       // 맵 데이터 미리 저장
@@ -3932,6 +3947,7 @@ function connectMultiWs(url, joinMsg){
     if(msg.type==='waiting'){
       // 모든 플레이어 charId 맵 업데이트
       window._charIdMap = window._charIdMap || {};
+      window._multiCamInit = false;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       renderWaitingPlayers(msg.players, msg.hostId);
       renderWaitingHostArea(msg.hostId===myMultiId);
@@ -3947,7 +3963,7 @@ function connectMultiWs(url, joinMsg){
       if(msg.tiles){ tiles=new Uint8Array(msg.tiles); }
       MAP_W=msg.mapW||MAP_W; MAP_H=msg.mapH||MAP_H;
       COLS=Math.round(MAP_W/TILE); ROWS=Math.round(MAP_H/TILE);
-      // 필수 변수 전부 초기화 (싱글 initGame과 동일하게)
+      // 필수 변수 전부 초기화
       explored      = new Uint8Array(COLS*ROWS);
       multiState    = null;
       particles     = [];
@@ -3961,6 +3977,11 @@ function connectMultiWs(url, joinMsg){
       camX=0; camY=0;
       tick=0;
       window._fog2=null; window._fog2C=null;
+      window._charIdMap = window._charIdMap || {};
+      window._multiCamInit = false;
+      // BGM 시작 (싱글과 동일)
+      startBGM(); setBGMStage(1);
+      addMuteButton();
       // HUD 세팅
       updateMultiHUD([]);
       // 루프 시작
@@ -3974,13 +3995,17 @@ function connectMultiWs(url, joinMsg){
       multiState=msg;
       // charId 맵 갱신
       window._charIdMap = window._charIdMap || {};
+      window._multiCamInit = false;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       // 첫 state 수신 시 카메라 즉시 점프
-      if(tick===0||tick===1){
+      if(!window._multiCamInit){
         const _me=msg.players&&msg.players.find(p=>p.id===myMultiId);
         if(_me&&canvas){
           camX=_me.x-canvas.width/2;
           camY=_me.y-canvas.height/2;
+          camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
+          camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
+          window._multiCamInit=true;
         }
       }
       msg.players.forEach(p=>{
@@ -3992,11 +4017,18 @@ function connectMultiWs(url, joinMsg){
           if(c>=0&&c<COLS&&rr>=0&&rr<ROWS) explored[rr*COLS+c]=1;
         }
       });
+      // 피격 사운드 감지
+      if(window._prevMultiState && msg.players){
+        const prevMe = window._prevMultiState.players&&window._prevMultiState.players.find(p=>p.id===myMultiId);
+        const curMe  = msg.players.find(p=>p.id===myMultiId);
+        if(prevMe&&curMe&&curMe.hp<prevMe.hp) SFX.hit&&SFX.hit();
+      }
+      window._prevMultiState = {players: msg.players?msg.players.map(p=>({id:p.id,hp:p.hp})):[]};
       updateMultiHUD(msg.players);
       return;
     }
 
-    if(msg.type==='boss_spawn') showAlert('👑 보스 등장!');
+    if(msg.type==='boss_spawn') showAlert('👑 보스 등장!'); SFX.bossSpawn&&SFX.bossSpawn();
     if(msg.type==='game_won') showEnding(true);
     if(msg.type==='game_over') showEnding(false);
     if(msg.type==='stage_clear') showAlert(`🎉 스테이지 ${msg.stage-1} 클리어!`);
@@ -4412,6 +4444,33 @@ function multiDraw(){
     ctx.fillStyle=PCOLORS[p.colorIdx]||'#44aaff';ctx.fillRect(sxp-bw/2,syp-20,bw*(Math.max(0,p.hp)/p.maxHp),4);
     ctx.restore();
   });
+
+  // ── 내 플레이어 조준선 + 크로스헤어 (싱글과 동일) ──
+  if(me && me.alive){
+    const psx=me.x-camX, psy=me.y-camY;
+    const ang=window._multiMouseAngle||0;
+    ctx.save();
+    // 조준선
+    ctx.strokeStyle='rgba(100,200,255,0.35)';
+    ctx.lineWidth=1; ctx.setLineDash([6,6]);
+    ctx.beginPath();
+    ctx.moveTo(psx+Math.cos(ang)*18, psy+Math.sin(ang)*18);
+    ctx.lineTo(psx+Math.cos(ang)*200, psy+Math.sin(ang)*200);
+    ctx.stroke(); ctx.setLineDash([]);
+    // 크로스헤어
+    const msx=mouse.x, msy=mouse.y;
+    const cr=10;
+    ctx.strokeStyle='rgba(100,220,255,0.85)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(msx,msy,cr,0,Math.PI*2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(msx-cr-4,msy); ctx.lineTo(msx-cr+3,msy);
+    ctx.moveTo(msx+cr-3,msy); ctx.lineTo(msx+cr+4,msy);
+    ctx.moveTo(msx,msy-cr-4); ctx.lineTo(msx,msy-cr+3);
+    ctx.moveTo(msx,msy+cr-3); ctx.lineTo(msx,msy+cr+4);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   ctx.restore(); // shake
   drawMinimap2(Array.isArray(multiState.players)?multiState.players:[]);
