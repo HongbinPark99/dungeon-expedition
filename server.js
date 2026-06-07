@@ -109,7 +109,7 @@ function createRoom(roomName) {
 // ── 대기실 브로드캐스트 ──────────────────────────────
 function broadcastWaiting(room) {
   const playerList = Object.values(room.players).map(p=>({
-    id:p.id, name:p.name, colorIdx:p.colorIdx
+    id:p.id, name:p.name, colorIdx:p.colorIdx, charId:p.charId||'photo0'
   }));
   broadcastRoom(room, {
     type:'waiting',
