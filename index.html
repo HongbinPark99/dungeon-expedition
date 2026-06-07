@@ -163,7 +163,35 @@ canvas{display:block;cursor:none;}
 .skill-slot.ready{border-color:#44aaff;box-shadow:0 0 10px #44aaff44;}
 .skill-slot.active{border-color:#fff;box-shadow:0 0 18px #fff6;}
 
-/* ── 아이템 목록 ── */
+/* ── 캐릭터 선택 ── */
+#char-select{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  background:#0b0d1e;border:1px solid #2a2d50;border-radius:12px;
+  padding:14px 20px;margin-top:4px;
+}
+#char-select .cs-title{
+  font-family:'Black Han Sans',sans-serif;font-size:.85rem;
+  color:#d4a832;letter-spacing:2px;
+}
+.char-cards{
+  display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
+}
+.char-card{
+  width:76px;cursor:pointer;border-radius:10px;
+  border:2px solid #2a2d50;background:#0d0f20;
+  padding:6px 4px;text-align:center;transition:.15s;
+  user-select:none;
+}
+.char-card:hover{ border-color:#d4a832;background:#16182e; }
+.char-card.selected{
+  border-color:#d4a832;background:#1a1c30;
+  box-shadow:0 0 14px #d4a83266;
+}
+.char-card canvas{ display:block;margin:0 auto 4px; }
+.char-card .cn{ font-size:.6rem;color:#aac; }
+.char-card .ct{ font-size:.5rem;color:#556;margin-top:1px; }
+
+/* ── 아이템 목록 ── *//* ── 아이템 목록 ── */
 #item-tray{
   position:fixed;top:60px;left:14px;
   background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;
@@ -247,43 +275,59 @@ canvas{display:block;cursor:none;}
 }
 .m-skill-btn.m-ready{ border-color:#44aaff; box-shadow:0 0 8px #44aaff55; }
 
-/* 오른쪽 조준 조이스틱 */
+/* 오른쪽 공격+조준 통합 조이스틱 */
 #aim-joystick-zone{
-  position:absolute;bottom:20px;right:170px;
-  width:140px;height:140px;
+  position:absolute;bottom:16px;right:16px;
+  width:160px;height:160px;
   pointer-events:all;touch-action:none;
 }
 #aim-joystick-base{
   position:absolute;inset:0;
   border-radius:50%;
-  background:rgba(255,100,100,0.08);
-  border:2px solid rgba(255,150,150,0.2);
-  backdrop-filter:blur(2px);
+  background:rgba(255,80,80,0.1);
+  border:2.5px solid rgba(255,120,80,0.35);
+  backdrop-filter:blur(3px);
+  box-shadow:0 0 18px rgba(255,60,60,0.15);
+}
+/* 발사 표시 링 (누르고 있을 때) */
+#aim-joystick-base.firing{
+  background:rgba(255,100,60,0.25);
+  border-color:rgba(255,160,80,0.8);
+  box-shadow:0 0 28px rgba(255,80,40,0.5);
 }
 #aim-joystick-stick{
   position:absolute;
-  width:52px;height:52px;
+  width:62px;height:62px;
   border-radius:50%;
-  background:radial-gradient(circle at 35% 35%,rgba(255,200,200,0.5),rgba(255,100,100,0.35));
-  border:2px solid rgba(255,130,100,0.7);
-  box-shadow:0 0 14px rgba(255,80,80,0.4);
+  background:radial-gradient(circle at 35% 35%,rgba(255,180,120,0.9),rgba(220,80,40,0.7));
+  border:2.5px solid rgba(255,160,100,0.9);
+  box-shadow:0 0 18px rgba(255,80,40,0.6);
   top:50%;left:50%;
   transform:translate(-50%,-50%);
   transition:none;
   pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;
 }
-/* 조준 레이블 */
-#aim-joystick-zone::after{
-  content:'조준';
-  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
-  font-size:.55rem;color:rgba(255,160,160,0.6);
-  pointer-events:none;
+/* 레이블 */
+#aim-joystick-zone::before{
+  content:'🔫 조준+발사';
+  position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  font-size:.52rem;color:rgba(255,160,120,0.7);
+  pointer-events:none;white-space:nowrap;
 }
-#joystick-zone::after{
-  content:'이동';
-  position:absolute;top:-18px;left:50%;transform:translateX(-50%);
-  font-size:.55rem;color:rgba(160,200,255,0.6);
-  pointer-events:none;
+#joystick-zone::before{
+  content:'🕹 이동';
+  position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  font-size:.52rem;color:rgba(160,200,255,0.7);
+  pointer-events:none;white-space:nowrap;
+}
+/* 공격 버튼 숨김 (통합됨) */
+#btn-attack{ display:none !important; }
+#action-buttons{
+  position:absolute;bottom:190px;right:20px;
+  display:flex;flex-direction:column;gap:8px;align-items:flex-end;
+  pointer-events:all;touch-action:none;
 }
 
 @media (pointer:coarse) and (max-width:900px){
@@ -312,8 +356,14 @@ canvas{display:block;cursor:none;}
     <b>우클릭 / Z</b> 폭탄 &nbsp;|&nbsp; <b>X</b> 방패막 &nbsp;|&nbsp; <b>C</b> 번개<br>
     안개 속 보스 방을 탐험해 찾아라!
   </div>
+  <!-- 캐릭터 선택 -->
+  <div id="char-select">
+    <div class="cs-title">⚔ 캐릭터 선택</div>
+    <div class="char-cards" id="char-cards"></div>
+  </div>
+
   <!-- 1인 플레이 -->
-  <button id="start-btn">혼자 탐험하기</button>
+  <button id="start-btn">탐험 시작</button>
 
   <div style="color:#445;font-size:.75rem;margin-top:4px">── 또는 ──</div>
 
@@ -394,13 +444,13 @@ canvas{display:block;cursor:none;}
     <div id="joystick-stick"></div>
   </div>
 
-  <!-- 오른쪽 조준 조이스틱 -->
+  <!-- 오른쪽 조준+공격 통합 조이스틱 -->
   <div id="aim-joystick-zone">
     <div id="aim-joystick-base"></div>
-    <div id="aim-joystick-stick"></div>
+    <div id="aim-joystick-stick" id="aim-stick-icon">🔫</div>
   </div>
 
-  <!-- 액션 버튼들 -->
+  <!-- 스킬 버튼들 (공격 버튼 제거됨) -->
   <div id="action-buttons">
     <div class="action-row">
       <div class="m-skill-btn m-ready" id="m-thunder" data-skill="thunder">
@@ -413,9 +463,8 @@ canvas{display:block;cursor:none;}
         <span>💣</span><span class="m-cd" id="m-cd-bomb">준비</span>
       </div>
     </div>
-    <div class="action-row">
-      <div id="btn-attack">🔫</div>
-    </div>
+    <!-- 공격은 조준 조이스틱에 통합 -->
+    <div id="btn-attack" style="display:none"></div>
   </div>
 </div>
 </div>
@@ -821,86 +870,90 @@ function initMobileControls(){
   jZone.addEventListener('touchend',   joyEnd, {passive:false});
   jZone.addEventListener('touchcancel',joyEnd, {passive:false});
 
-  // ── 오른쪽 조준 조이스틱 ──────────────────────────────
-  const aimJZone  = document.getElementById('aim-joystick-zone');
-  const aimStick  = document.getElementById('aim-joystick-stick');
-  const AIM_BASE_R = 65;
+  // ── 오른쪽 통합 조준+공격 조이스틱 ─────────────────
+  const aimJZone   = document.getElementById('aim-joystick-zone');
+  const aimBase    = document.getElementById('aim-joystick-base');
+  const aimStick   = document.getElementById('aim-joystick-stick');
+  const AIM_BASE_R  = 72; // 더 큰 반지름
   const aimJoyState = {dx:0, dy:0, active:false, id:-1};
+  let   aimFireInterval = null;
 
   function aimJoyMove(cx, cy, ox, oy){
-    let dx = cx-ox, dy = cy-oy;
-    const dist = Math.hypot(dx, dy);
-    if(dist > AIM_BASE_R){ dx *= AIM_BASE_R/dist; dy *= AIM_BASE_R/dist; }
-    aimStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    aimJoyState.dx = dx / AIM_BASE_R;
-    aimJoyState.dy = dy / AIM_BASE_R;
-    // 조이스틱 방향으로 즉시 조준
-    if(player && player.alive && (dx||dy)){
-      player.facing = Math.atan2(dy, dx);
-      // 크로스헤어 위치도 업데이트 (플레이어 기준 방향)
+    let dx=cx-ox, dy=cy-oy;
+    const dist=Math.hypot(dx,dy);
+    const clamped=Math.min(dist,AIM_BASE_R);
+    const nx=dist>0?dx/dist*clamped:0;
+    const ny=dist>0?dy/dist*clamped:0;
+    aimStick.style.transform=`translate(calc(-50% + ${nx}px), calc(-50% + ${ny}px))`;
+    aimJoyState.dx=nx/AIM_BASE_R;
+    aimJoyState.dy=ny/AIM_BASE_R;
+    // 조이스틱 방향으로 즉시 조준 (데드존 15%)
+    if(player&&player.alive&&dist>AIM_BASE_R*0.15){
+      player.facing=Math.atan2(dy,dx);
       if(gameRunning){
-        const psx = player.x - camX;
-        const psy = player.y - camY;
-        mouse.x = psx + Math.cos(player.facing) * 120;
-        mouse.y = psy + Math.sin(player.facing) * 120;
+        const psx=player.x-camX, psy=player.y-camY;
+        mouse.x=psx+Math.cos(player.facing)*130;
+        mouse.y=psy+Math.sin(player.facing)*130;
       }
     }
   }
 
-  aimJZone.addEventListener('touchstart', e=>{
+  function startFiring(){
+    // 즉시 첫 발사
+    if(gameRunning&&player&&player.alive) doAttack();
+    // 연사 (100ms 간격)
+    if(aimFireInterval) clearInterval(aimFireInterval);
+    aimFireInterval=setInterval(()=>{
+      if(gameRunning&&player&&player.alive){
+        if(aimJoyState.dx||aimJoyState.dy)
+          player.facing=Math.atan2(aimJoyState.dy,aimJoyState.dx);
+        doAttack();
+      }
+    },100);
+    aimBase.classList.add('firing');
+    const wp=WEAPONS&&WEAPONS[player&&player.weapon];
+    if(aimStick) aimStick.textContent=wp?wp.emoji:'🔫';
+  }
+
+  function stopFiring(){
+    if(aimFireInterval){ clearInterval(aimFireInterval); aimFireInterval=null; }
+    aimBase.classList.remove('firing');
+  }
+
+  aimJZone.addEventListener('touchstart',e=>{
     e.preventDefault();
-    const t = e.changedTouches[0];
-    const r = aimJZone.getBoundingClientRect();
-    aimJoyState.id = t.identifier;
-    aimJoyState.active = true;
-    aimJoyMove(t.clientX, t.clientY, r.left+r.width/2, r.top+r.height/2);
+    const t=e.changedTouches[0];
+    const r=aimJZone.getBoundingClientRect();
+    aimJoyState.id=t.identifier; aimJoyState.active=true;
+    aimJoyMove(t.clientX,t.clientY,r.left+r.width/2,r.top+r.height/2);
+    startFiring();
   },{passive:false});
 
-  aimJZone.addEventListener('touchmove', e=>{
+  aimJZone.addEventListener('touchmove',e=>{
     e.preventDefault();
     for(const t of e.changedTouches){
-      if(t.identifier !== aimJoyState.id) continue;
-      const r = aimJZone.getBoundingClientRect();
-      aimJoyMove(t.clientX, t.clientY, r.left+r.width/2, r.top+r.height/2);
+      if(t.identifier!==aimJoyState.id) continue;
+      const r=aimJZone.getBoundingClientRect();
+      aimJoyMove(t.clientX,t.clientY,r.left+r.width/2,r.top+r.height/2);
     }
   },{passive:false});
 
   function aimJoyEnd(e){
     e.preventDefault();
     for(const t of e.changedTouches){
-      if(t.identifier !== aimJoyState.id) continue;
-      aimJoyState.active = false;
-      aimJoyState.id = -1;
-      aimJoyState.dx = 0;
-      aimJoyState.dy = 0;
-      aimStick.style.transform = 'translate(-50%,-50%)';
+      if(t.identifier!==aimJoyState.id) continue;
+      aimJoyState.active=false; aimJoyState.id=-1;
+      aimJoyState.dx=0; aimJoyState.dy=0;
+      aimStick.style.transform='translate(-50%,-50%)';
+      stopFiring();
     }
   }
-  aimJZone.addEventListener('touchend',   aimJoyEnd, {passive:false});
-  aimJZone.addEventListener('touchcancel',aimJoyEnd, {passive:false});
+  aimJZone.addEventListener('touchend',   aimJoyEnd,{passive:false});
+  aimJZone.addEventListener('touchcancel',aimJoyEnd,{passive:false});
 
   // ── 공격 버튼 ────────────────────────────────────────
-  const btnAtk = document.getElementById('btn-attack');
-  btnAtk.addEventListener('touchstart', e=>{
-    e.preventDefault();
-    if(gameRunning && player && player.alive) doAttack();
-  },{passive:false});
-  // 홀드 연사
-  let atkInterval = null;
-  btnAtk.addEventListener('touchstart', e=>{
-    e.preventDefault();
-    atkInterval = setInterval(()=>{
-      if(gameRunning&&player&&player.alive){
-        // 조준 조이스틱 방향이 있으면 그쪽으로 발사
-        if(typeof aimJoyState!=='undefined'&&aimJoyState.active&&(aimJoyState.dx||aimJoyState.dy)){
-          player.facing = Math.atan2(aimJoyState.dy, aimJoyState.dx);
-        }
-        doAttack();
-      }
-    }, 90);
-  },{passive:false});
-  btnAtk.addEventListener('touchend',   ()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
-  btnAtk.addEventListener('touchcancel',()=>{ clearInterval(atkInterval); atkInterval=null; },{passive:false});
+  // 공격 버튼은 조준 조이스틱에 통합됨 — 이벤트 불필요
+  const btnAtk = document.getElementById('btn-attack'); // 숨겨진 상태
 
   // ── 스킬 버튼들 ──────────────────────────────────────
   document.getElementById('m-bomb').addEventListener('touchstart', e=>{
@@ -946,11 +999,73 @@ function updateMobileSkillHUD(){
       cdEl.textContent=(s.cd/60).toFixed(1)+'s';
     }
   });
-  // 공격 버튼 무기 아이콘
+  // 조준 조이스틱 스틱에 무기 이모지 표시
   const wp = WEAPONS&&WEAPONS[player&&player.weapon]||{emoji:'🔫'};
-  const ba = document.getElementById('btn-attack');
-  if(ba) ba.textContent = wp.emoji||'🔫';
+  const aimSt = document.getElementById('aim-joystick-stick');
+  if(aimSt&&!aimJoyState.active) aimSt.textContent = wp.emoji||'🔫';
 }
+
+// ══════════════════════════════════════════════════════
+//  캐릭터 선택 시스템
+// ══════════════════════════════════════════════════════
+const CHAR_LIST = [
+  { id:'player',           name:'기사',     desc:'기본 용사',           color:'#4af' },
+  { id:'char_headphone',   name:'헤드폰',   desc:'헤드폰 용사',         color:'#88f' },
+  { id:'char_cap',         name:'캡모자',   desc:'모자 쓴 궁수',        color:'#aaf' },
+  { id:'char_thumbsup',    name:'엄지척',   desc:'마법사 친구',         color:'#c7f' },
+  { id:'char_tall',        name:'키다리',   desc:'안경 쓴 보스헌터',    color:'#ffd700' },
+];
+
+// 커스텀 캐릭터 드로우 함수 맵
+const CUSTOM_CHAR_DRAW = {
+  player:         (c,x,y,sz,f,t)=>drawCharPlayer(c,x,y,sz,f,t),
+  char_headphone: (c,x,y,sz,f,t)=>drawCharPlayer(c,x,y,sz,f,t), // 같은 함수 (헤드폰)
+  char_cap:       (c,x,y,sz,f,t)=>drawCharArcherFriend(c,x,y,sz,f,t,false),
+  char_thumbsup:  (c,x,y,sz,f,t)=>drawCharMageFriend(c,x,y,sz,f,t,false),
+  char_tall:      (c,x,y,sz,f,t)=>drawCharTallHero(c,x,y,sz,f,t,false),
+};
+
+let selectedChar = 'player';
+
+function buildCharSelectUI(){
+  const container = document.getElementById('char-cards');
+  if(!container) return;
+  container.innerHTML='';
+
+  CHAR_LIST.forEach(ch=>{
+    // 미리보기 캔버스
+    const cv = document.createElement('canvas');
+    cv.width=60; cv.height=70;
+    const cc = cv.getContext('2d');
+    cc.fillStyle='#0d0f20';
+    cc.fillRect(0,0,60,70);
+
+    // 캐릭터 그리기
+    const drawFn = CUSTOM_CHAR_DRAW[ch.id]||CUSTOM_CHAR_DRAW.player;
+    try{ drawFn(cc,30,40,18,0,0); }catch(e){}
+
+    const card = document.createElement('div');
+    card.className='char-card'+(ch.id===selectedChar?' selected':'');
+    card.dataset.id=ch.id;
+    card.innerHTML=`<div class="cn">${ch.name}</div><div class="ct">${ch.desc}</div>`;
+    card.insertBefore(cv, card.firstChild);
+
+    card.addEventListener('click',()=>{
+      selectedChar=ch.id;
+      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    container.appendChild(card);
+  });
+}
+
+// 선택된 캐릭터로 플레이어 스프라이트 교체
+function applySelectedChar(){
+  const drawFn = CUSTOM_CHAR_DRAW[selectedChar]||CUSTOM_CHAR_DRAW.player;
+  // drawPlayerSprite 를 동적으로 교체
+  window._activePlayerDraw = drawFn;
+}
+
 
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
@@ -1038,7 +1153,8 @@ function initGame(keepStage=false){
   for(let i=0;i<initCount;i++) spawnMonster();
 
   if(stage===1){
-    startBGM(); setBGMStage(stage); addMuteButton();
+    applySelectedChar();
+  startBGM(); setBGMStage(stage); addMuteButton();
   updateWeaponHUD();
   if(isMobile&&!mobileActive) initMobileControls();
   addLog('⚔ 던전 탐험을 시작합니다!','win');
@@ -3810,7 +3926,22 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive){
   else if(blinking){ c.globalAlpha=0.5; }
   else { c.globalAlpha=1; }
   const sz=22;
-  drawCachedChar(c,'player',sx,sy,sz,facing,tick,false,false);
+  // 선택된 캐릭터 사용
+  const drawFn = (window._activePlayerDraw)||((cc,x,y,s,f,t)=>drawCharPlayer(cc,x,y,s,f,t));
+  const key='player_'+selectedChar;
+  // 캐시 활용
+  const facingDir=Math.cos(facing||0)<0?1:0;
+  const animF=_animFrame(tick);
+  const ckey=key+'|22|'+facingDir+'|0|0|'+animF;
+  if(!_charCache.has(ckey)){
+    const oc=document.createElement('canvas');
+    oc.width=72;oc.height=72;
+    const oc2=oc.getContext('2d');
+    try{ drawFn(oc2,36,36,22,facingDir?Math.PI:0,animF*7); }catch(e){}
+    _charCache.set(ckey,oc);
+  }
+  const img=_charCache.get(ckey);
+  c.drawImage(img,sx-img.width/2|0,sy-img.height/2|0);
   c.globalAlpha=1;
 }
 
@@ -3966,6 +4097,9 @@ function loop(t=0){
 
 // ── 버튼 ─────────────────────────────────────────────
 document.getElementById('start-btn').addEventListener('click',()=>{SFX.click();initGame();});
+// 로비 캐릭터 선택 UI
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildCharSelectUI);
+else buildCharSelectUI();
 document.getElementById('retry-btn').addEventListener('click',()=>{
   document.getElementById('ending').style.display='none';
   if(multiMode) connectMulti(currentServerUrl);
