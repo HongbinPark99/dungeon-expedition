@@ -2308,6 +2308,177 @@ function linGrad(c,x0,y0,x1,y1,stops){
   stops.forEach(([p,col])=>g.addColorStop(p,col)); return g;
 }
 
+
+// ══════════════════════════════════════════════════════
+//  사진 기반 커스텀 캐릭터 4인방
+// ══════════════════════════════════════════════════════
+
+// 캐릭터2: 모자 궁수 (캡모자+안경+흰티)
+function drawCharArcherFriend(c,x,y,sz,facing,t,elite){
+  const fl=Math.cos(facing||0)<0?-1:1;
+  const bob=Math.sin(t*0.2)*2;
+  c.save(); c.translate(x,y+bob);
+  // 다리
+  [-1,1].forEach(s=>{
+    const ls=Math.sin(t*0.2)*sz*0.06*(s===1?1:-1);
+    c.beginPath(); c.roundRect(s*sz*0.08,sz*0.42+ls,sz*0.13,sz*0.34,3);
+    c.fillStyle='#334'; c.fill();
+    c.beginPath(); c.ellipse(s*sz*0.1,sz*0.77+ls,sz*0.1,sz*0.06,0,0,Math.PI*2);
+    c.fillStyle='#222'; c.fill();
+  });
+  // 몸통(흰티)
+  c.beginPath(); c.ellipse(0,sz*0.12,sz*0.28,sz*0.34,0,0,Math.PI*2);
+  c.fillStyle='#eeeef0'; c.fill(); c.strokeStyle='#ccc'; c.lineWidth=1; c.stroke();
+  // 팔
+  [-1,1].forEach(s=>{
+    const armS=Math.sin(t*0.2)*0.22;
+    c.save(); c.translate(s*sz*0.28,0); c.rotate(s*(-0.2+armS*(s===fl?1:-1)));
+    c.beginPath(); c.roundRect(-sz*0.06,-sz*0.02,sz*0.12,sz*0.3,3);
+    c.fillStyle='#eeeef0'; c.fill();
+    c.beginPath(); c.ellipse(0,sz*0.3,sz*0.075,sz*0.065,0,0,Math.PI*2);
+    c.fillStyle='#e0c0a0'; c.fill(); c.restore();
+  });
+  // 목
+  c.beginPath(); c.rect(-sz*0.07,-sz*0.09,sz*0.14,sz*0.12); c.fillStyle='#e0c0a0'; c.fill();
+  // 얼굴
+  c.beginPath(); c.ellipse(0,-sz*0.26,sz*0.22,sz*0.22,0,0,Math.PI*2);
+  c.fillStyle=grad(c,0,-sz*0.4,sz*0.22,'#f0d0b0','#d0a880'); c.fill();
+  // 눈썹
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.moveTo(s*sz*0.05,-sz*0.31); c.lineTo(s*sz*0.15,-sz*0.33);
+    c.strokeStyle='#2a1a0a'; c.lineWidth=sz*0.03; c.lineCap='round'; c.stroke();
+  });
+  // 눈
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.ellipse(s*sz*0.1,-sz*0.25,sz*0.04,sz*0.04,0,0,Math.PI*2);
+    c.fillStyle='#1a1a1a'; c.fill();
+  });
+  // 안경
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.roundRect(s*sz*0.02-sz*0.1,-sz*0.29,sz*0.12,sz*0.09,sz*0.025);
+    c.strokeStyle='#111'; c.lineWidth=sz*0.028; c.stroke();
+    c.fillStyle='rgba(180,220,255,0.1)'; c.fill();
+  });
+  c.beginPath(); c.moveTo(-sz*0.08,-sz*0.25); c.lineTo(sz*0.02,-sz*0.25);
+  c.strokeStyle='#111'; c.lineWidth=sz*0.022; c.stroke();
+  // 코+입
+  c.beginPath(); c.arc(0,-sz*0.18,sz*0.025,0,Math.PI*2); c.fillStyle='#c09070'; c.fill();
+  c.beginPath(); c.arc(0,-sz*0.12,sz*0.055,0.1,Math.PI-0.1); c.strokeStyle='#a07050'; c.lineWidth=sz*0.022; c.stroke();
+  // 머리
+  c.beginPath(); c.ellipse(0,-sz*0.28,sz*0.22,sz*0.2,0,0,Math.PI*2); c.fillStyle='#1a1208'; c.fill();
+  // 캡모자 (회색, 특징!)
+  c.beginPath(); c.ellipse(0,-sz*0.38,sz*0.24,sz*0.12,-0.05,Math.PI,0); c.fillStyle='#7a7a82'; c.fill();
+  c.beginPath(); c.ellipse(0,-sz*0.38,sz*0.24,sz*0.1,-0.05,0,Math.PI); c.fillStyle='#6a6a72'; c.fill();
+  c.beginPath(); c.ellipse(fl*sz*0.1,-sz*0.38,sz*0.18,sz*0.055,fl*0.1,0,Math.PI*2); c.fillStyle='#6a6a72'; c.fill();
+  c.fillStyle='#ddd'; c.font=`bold ${sz*0.06}px sans-serif`; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('A',-fl*sz*0.03,-sz*0.38);
+  c.restore();
+}
+
+// 캐릭터3: 엄지척 마법사 (검정 폴로, 긴 머리)
+function drawCharMageFriend(c,x,y,sz,facing,t,elite){
+  const fl=Math.cos(facing||0)<0?-1:1;
+  const bob=Math.sin(t*0.15)*2;
+  c.save(); c.translate(x,y+bob);
+  // 다리
+  [-1,1].forEach(s=>{
+    const ls=Math.sin(t*0.15)*sz*0.05*(s===1?1:-1);
+    c.beginPath(); c.roundRect(s*sz*0.08,sz*0.43+ls,sz*0.13,sz*0.33,3); c.fillStyle='#111'; c.fill();
+    c.beginPath(); c.ellipse(s*sz*0.1,sz*0.77+ls,sz*0.1,sz*0.06,0,0,Math.PI*2); c.fillStyle='#222'; c.fill();
+  });
+  // 몸통(검정 폴로)
+  c.beginPath(); c.ellipse(0,sz*0.12,sz*0.27,sz*0.33,0,0,Math.PI*2);
+  c.fillStyle='#0d0d0d'; c.fill(); c.strokeStyle='#333'; c.lineWidth=1.5; c.stroke();
+  c.beginPath(); c.moveTo(-sz*0.07,-sz*0.07); c.lineTo(0,sz*0.01); c.lineTo(sz*0.07,-sz*0.07);
+  c.strokeStyle='#444'; c.lineWidth=2; c.stroke();
+  // 팔
+  c.save(); c.translate(-fl*sz*0.27,0); c.rotate(-fl*(-0.15));
+  c.beginPath(); c.roundRect(-sz*0.06,-sz*0.02,sz*0.12,sz*0.3,3); c.fillStyle='#0d0d0d'; c.fill();
+  c.beginPath(); c.ellipse(0,sz*0.3,sz*0.07,sz*0.065,0,0,Math.PI*2); c.fillStyle='#e0c0a0'; c.fill(); c.restore();
+  // 엄지척 팔
+  c.save(); c.translate(fl*sz*0.27,-sz*0.05); c.rotate(fl*0.25);
+  c.beginPath(); c.roundRect(-sz*0.06,-sz*0.02,sz*0.12,sz*0.27,3); c.fillStyle='#0d0d0d'; c.fill();
+  c.beginPath(); c.ellipse(0,sz*0.27,sz*0.08,sz*0.09,0,0,Math.PI*2); c.fillStyle='#e0c0a0'; c.fill();
+  c.beginPath(); c.roundRect(-sz*0.03,sz*0.1,sz*0.065,sz*0.16,sz*0.03);
+  c.fillStyle='#e0c0a0'; c.fill(); c.strokeStyle='#c09070'; c.lineWidth=1; c.stroke(); c.restore();
+  // 목+얼굴
+  c.beginPath(); c.rect(-sz*0.07,-sz*0.09,sz*0.14,sz*0.12); c.fillStyle='#e0c0a0'; c.fill();
+  c.beginPath(); c.ellipse(0,-sz*0.26,sz*0.21,sz*0.22,0,0,Math.PI*2);
+  c.fillStyle=grad(c,0,-sz*0.4,sz*0.22,'#f0d0b0','#d0a880'); c.fill();
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.moveTo(s*sz*0.04,-sz*0.32); c.lineTo(s*sz*0.14,-sz*0.34);
+    c.strokeStyle='#1a1208'; c.lineWidth=sz*0.032; c.lineCap='round'; c.stroke();
+    c.beginPath(); c.ellipse(s*sz*0.09,-sz*0.26,sz*0.042,sz*0.042,0,0,Math.PI*2);
+    c.fillStyle='#1a1a1a'; c.fill();
+  });
+  c.beginPath(); c.arc(0,-sz*0.18,sz*0.024,0,Math.PI*2); c.fillStyle='#c09070'; c.fill();
+  c.beginPath(); c.arc(0,-sz*0.12,sz*0.06,0.15,Math.PI-0.15); c.strokeStyle='#a07050'; c.lineWidth=sz*0.025; c.stroke();
+  // 머리(긴 앞머리)
+  c.beginPath(); c.ellipse(0,-sz*0.28,sz*0.21,sz*0.18,0,0,Math.PI*2); c.fillStyle='#1a1208'; c.fill();
+  [-sz*0.12,0,sz*0.12].forEach(hx=>{
+    c.beginPath(); c.moveTo(hx,-sz*0.35); c.quadraticCurveTo(hx+sz*0.03,-sz*0.44,hx-sz*0.02,-sz*0.47);
+    c.strokeStyle='#1a1208'; c.lineWidth=sz*0.05; c.lineCap='round'; c.stroke();
+  });
+  c.restore();
+}
+
+// 캐릭터4: 키큰 보스헌터 (안경+검정폴로+반바지+엄지척)
+function drawCharTallHero(c,x,y,sz,facing,t,elite){
+  const fl=Math.cos(facing||0)<0?-1:1;
+  const bob=Math.sin(t*0.16)*1.8;
+  c.save(); c.translate(x,y+bob);
+  // 다리(긴 편, 반바지)
+  [-1,1].forEach(s=>{
+    const ls=Math.sin(t*0.16)*sz*0.06*(s===1?1:-1);
+    c.beginPath(); c.roundRect(s*sz*0.09,sz*0.42+ls,sz*0.14,sz*0.18,3); c.fillStyle='#111'; c.fill();
+    c.beginPath(); c.roundRect(s*sz*0.09,sz*0.6+ls,sz*0.13,sz*0.2,3); c.fillStyle='#e0c0a0'; c.fill();
+    c.beginPath(); c.ellipse(s*sz*0.11,sz*0.81+ls,sz*0.11,sz*0.06,0,0,Math.PI*2); c.fillStyle='#5a3a20'; c.fill();
+  });
+  c.beginPath(); c.rect(-sz*0.24,sz*0.42,sz*0.48,sz*0.18); c.fillStyle='#111'; c.fill();
+  // 몸통
+  c.beginPath(); c.ellipse(0,sz*0.1,sz*0.3,sz*0.35,0,0,Math.PI*2); c.fillStyle='#0d0d0d'; c.fill();
+  c.strokeStyle='#2a2a2a'; c.lineWidth=1.5; c.stroke();
+  // 카하트 로고
+  c.fillStyle='#b8860b'; c.font=`bold ${sz*0.08}px sans-serif`; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('C',fl*sz*0.14,sz*0.02);
+  c.beginPath(); c.moveTo(-sz*0.08,-sz*0.07); c.lineTo(0,sz*0.01); c.lineTo(sz*0.08,-sz*0.07);
+  c.strokeStyle='#333'; c.lineWidth=2; c.stroke();
+  // 팔
+  c.save(); c.translate(-fl*sz*0.3,sz*0.01);
+  c.beginPath(); c.roundRect(-sz*0.07,-sz*0.02,sz*0.14,sz*0.32,3); c.fillStyle='#0d0d0d'; c.fill();
+  c.beginPath(); c.ellipse(0,sz*0.32,sz*0.075,sz*0.07,0,0,Math.PI*2); c.fillStyle='#e0c0a0'; c.fill(); c.restore();
+  // 엄지척 팔
+  c.save(); c.translate(fl*sz*0.3,-sz*0.04); c.rotate(fl*(-0.45));
+  c.beginPath(); c.roundRect(-sz*0.07,-sz*0.02,sz*0.14,sz*0.3,3); c.fillStyle='#0d0d0d'; c.fill();
+  c.beginPath(); c.ellipse(0,sz*0.3,sz*0.08,sz*0.09,0,0,Math.PI*2); c.fillStyle='#e0c0a0'; c.fill();
+  c.beginPath(); c.roundRect(-sz*0.03,sz*0.12,sz*0.065,sz*0.17,sz*0.03);
+  c.fillStyle='#e0c0a0'; c.fill(); c.strokeStyle='#c09070'; c.lineWidth=1; c.stroke(); c.restore();
+  // 목+얼굴
+  c.beginPath(); c.rect(-sz*0.08,-sz*0.1,sz*0.16,sz*0.14); c.fillStyle='#e0c0a0'; c.fill();
+  c.beginPath(); c.ellipse(0,-sz*0.27,sz*0.24,sz*0.24,0,0,Math.PI*2);
+  c.fillStyle=grad(c,0,-sz*0.44,sz*0.24,'#f0d0b0','#d0a880'); c.fill();
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.moveTo(s*sz*0.04,-sz*0.33); c.quadraticCurveTo(s*sz*0.1,-sz*0.37,s*sz*0.17,-sz*0.32);
+    c.strokeStyle='#1a1208'; c.lineWidth=sz*0.038; c.lineCap='round'; c.stroke();
+    c.beginPath(); c.ellipse(s*sz*0.1,-sz*0.265,sz*0.044,sz*0.04,0,0,Math.PI*2);
+    c.fillStyle='#1a1a1a'; c.fill();
+    c.beginPath(); c.arc(s*sz*0.1+sz*0.01,-sz*0.27,sz*0.016,0,Math.PI*2); c.fillStyle='#fff'; c.fill();
+  });
+  // 안경
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.roundRect(s*sz*0.03-sz*0.13,-sz*0.31,sz*0.15,sz*0.1,sz*0.03);
+    c.strokeStyle='#111'; c.lineWidth=sz*0.03; c.stroke(); c.fillStyle='rgba(180,220,255,0.1)'; c.fill();
+  });
+  c.beginPath(); c.moveTo(-sz*0.1,-sz*0.265); c.lineTo(sz*0.03,-sz*0.265);
+  c.strokeStyle='#111'; c.lineWidth=sz*0.025; c.stroke();
+  c.beginPath(); c.arc(0,-sz*0.18,sz*0.03,0,Math.PI*2); c.fillStyle='#c09070'; c.fill();
+  c.beginPath(); c.arc(0,-sz*0.11,sz*0.07,0.2,Math.PI-0.2); c.strokeStyle='#a07050'; c.lineWidth=sz*0.025; c.stroke();
+  // 머리
+  c.beginPath(); c.ellipse(0,-sz*0.3,sz*0.24,sz*0.18,0,0,Math.PI*2); c.fillStyle='#0d0d10'; c.fill();
+  c.beginPath(); c.ellipse(0,-sz*0.42,sz*0.22,sz*0.12,0,0,Math.PI*2); c.fillStyle='#0d0d10'; c.fill();
+  c.restore();
+}
+
 // ── 플레이어: 기사 ────────────────────────────────────
 function drawCharPlayer(c,x,y,sz,facing,t){
   const f=facing||0;
@@ -3590,10 +3761,12 @@ function drawCachedChar(c, type, x, y, sz, facing, t, elite, enraged){
 
 // ── 캐릭터 타입 → 드로우 함수 매핑 ──────────────────
 const CHAR_DRAW = {
+  // ── 커스텀 4인방 캐릭터 ──
   player:    (c,x,y,sz,f,t,e)=>drawCharPlayer(c,x,y,sz,f,t),
+  // 추가 플레이어 스킨 (몬스터 타입에 할당)
   goblin:    drawCharGoblin,
-  skeleton:  drawCharSkeleton,
-  slime:     drawCharSlime,
+  skeleton:  (c,x,y,sz,f,t,e)=>drawCharArcherFriend(c,x,y,sz,f,t,e),
+  slime:     (c,x,y,sz,f,t,e)=>drawCharSlime(c,x,y,sz,f,t,e),
   orc:       drawCharOrc,
   archer:    drawCharArcher,
   shade:     drawCharShade,
@@ -3601,9 +3774,9 @@ const CHAR_DRAW = {
   mage:      drawCharMage,
   hunter:    drawCharHunter,
   bomber:    drawCharHunter,   // 헌터 베이스
-  vampire:   drawCharVampire,
+  vampire:   (c,x,y,sz,f,t,e)=>drawCharMageFriend(c,x,y,sz,f,t,e),
   golem:     drawCharGolem,
-  wraith:    drawCharShade,    // 섀도 베이스
+  wraith:    (c,x,y,sz,f,t,e)=>drawCharTallHero(c,x,y,sz,f,t,e),
   hydra:     drawCharDragon,   // 드래곤 베이스
   lich:      drawCharLich,
   dragon:    drawCharDragon,
