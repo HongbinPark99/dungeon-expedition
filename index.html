@@ -538,7 +538,7 @@ const SIGHT_R = 480;
 const P_SPEED = 2.0;
 const P_HP    = 120;
 const P_ATK   = 32;
-const P_RANGE = 68;
+const P_RANGE = 180;
 const P_CD    = 36;
 const IFRAMES = 48;
 const BULLET_SPEED = 10;
@@ -761,7 +761,7 @@ function _getACtx(){
   return _audioCtx;
 }
 function _tone(freq,type,dur,vol,detune,delay){
-  vol=vol||0.25;detune=detune||0;delay=delay||0;
+  vol=(vol||0.25)*0.45; // 볼륨 감소detune=detune||0;delay=delay||0;
   if(_sfxMuted)return;
   try{
     const ac=_getACtx(),o=ac.createOscillator(),g=ac.createGain();
@@ -773,7 +773,7 @@ function _tone(freq,type,dur,vol,detune,delay){
   }catch(e){}
 }
 function _noise(dur,vol,hi,delay){
-  vol=vol||0.15;hi=hi||800;delay=delay||0;
+  vol=(vol||0.15)*0.45; // 볼륨 감소hi=hi||800;delay=delay||0;
   if(_sfxMuted)return;
   try{
     const ac=_getACtx(),sz=ac.sampleRate*dur|0;
@@ -812,7 +812,7 @@ function startBGM(){
   stopBGM();
   try{
     const ac=_getACtx();
-    _bgmGain=ac.createGain();_bgmGain.gain.value=0.038;_bgmGain.connect(ac.destination);
+    _bgmGain=ac.createGain();_bgmGain.gain.value=0.018;_bgmGain.connect(ac.destination);
     [55,110].forEach(function(freq){
       const o=ac.createOscillator(),g=ac.createGain();
       o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.28;
@@ -833,7 +833,7 @@ function stopBGM(){
   _bgmOscs=[];
   if(_bgmGain){try{_bgmGain.disconnect();}catch(e){}_bgmGain=null;}
 }
-function setBGMStage(s){if(_bgmGain)_bgmGain.gain.value=0.03+Math.min(s,5)*0.007;}
+function setBGMStage(s){if(_bgmGain)_bgmGain.gain.value=0.015+Math.min(s,5)*0.003;}
 function addMuteButton(){
   if(document.getElementById('mute-btn'))return;
   const btn=document.createElement('button');
@@ -3771,18 +3771,17 @@ const FIXED_DT=1000/60; // 고정 60fps 업데이트
 
 function loop(t=0){
   rafId=requestAnimationFrame(loop);
-  const dt=Math.min(t-lastT, 100); // 최대 100ms (탭 복귀 시 스파이크 방지)
+  const dt=Math.min(t-lastT, 100);
   lastT=t;
 
   if(multiMode){
-    draw();
+    multiDraw();
     return;
   }
 
-  // 고정 타임스텝 누적
   accumT+=dt;
   let steps=0;
-  while(accumT>=FIXED_DT && steps<3){ // 최대 3스텝 (렉 스파이크 방지)
+  while(accumT>=FIXED_DT && steps<3){
     update();
     accumT-=FIXED_DT;
     steps++;
@@ -3925,7 +3924,8 @@ function connectMultiWs(url, joinMsg){
       // 맵 데이터 미리 저장
       tiles=new Uint8Array(msg.tiles);
       MAP_W=msg.mapW; MAP_H=msg.mapH;
-      COLS=Math.round(MAP_W/TILE); ROWS=Math.round(MAP_H/TILE);
+      COLS=msg.cols||Math.round(MAP_W/TILE);
+      ROWS=msg.rows||Math.round(MAP_H/TILE);
       explored=new Uint8Array(COLS*ROWS);
       bossArena=msg.bossArena;
 
@@ -3953,10 +3953,12 @@ function connectMultiWs(url, joinMsg){
       document.getElementById('waiting-screen').style.display='none';
       document.getElementById('game').style.display='block';
       document.getElementById('ending').style.display='none';
-      // 맵 데이터
+      // 맵 데이터 (서버에서 받은 값으로 정확히 설정)
       if(msg.tiles){ tiles=new Uint8Array(msg.tiles); }
       MAP_W=msg.mapW||MAP_W; MAP_H=msg.mapH||MAP_H;
-      COLS=Math.round(MAP_W/TILE); ROWS=Math.round(MAP_H/TILE);
+      COLS=msg.cols||Math.round(MAP_W/TILE);
+      ROWS=msg.rows||Math.round(MAP_H/TILE);
+      if(msg.bossArena) bossArena=msg.bossArena;
       // 필수 변수 전부 초기화
       explored      = new Uint8Array(COLS*ROWS);
       multiState    = null;
@@ -4492,13 +4494,7 @@ function drawMinimap2(players){
   });
 }
 
-// ── 메인 루프 오버라이드 ──────────────────────────────
-const _origLoop=loop;
-function loop(t=0){
-  rafId=requestAnimationFrame(loop);
-  if(multiMode) multiDraw();
-  else { update(); draw(); }
-}
+// 메인 루프 (통합됨)
 // rafId 재시작 방지
 if(rafId) cancelAnimationFrame(rafId);
 rafId=null;
