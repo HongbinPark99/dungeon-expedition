@@ -1015,6 +1015,10 @@ const CHAR_LIST = [
   { id:'char_thumbsup',    name:'엄지척',   desc:'마법사 친구',         color:'#c7f' },
   { id:'char_tall',        name:'키다리',   desc:'안경 쓴 보스헌터',    color:'#ffd700' },
   { id:'char_longcoat',    name:'롱코트',   desc:'제주도 쿨가이',       color:'#c8b89a' },
+  { id:'char_ferris_left',  name:'터틀넥',   desc:'관람차 왼쪽',         color:'#444' },
+  { id:'char_ferris_mid',   name:'코트남',   desc:'관람차 가운데',        color:'#c8a878' },
+  { id:'char_ferris_right', name:'볼살왕',   desc:'관람차 오른쪽',        color:'#f0c090' },
+  { id:'char_ferris_front', name:'안경남',   desc:'관람차 셀카 앞',       color:'#88ccff' },
 ];
 
 // 커스텀 캐릭터 드로우 함수 맵
@@ -1025,6 +1029,10 @@ const CUSTOM_CHAR_DRAW = {
   char_thumbsup:  (c,x,y,sz,f,t)=>drawCharMageFriend(c,x,y,sz,f,t,false),
   char_tall:      (c,x,y,sz,f,t)=>drawCharTallHero(c,x,y,sz,f,t,false),
   char_longcoat:  (c,x,y,sz,f,t)=>drawCharLongcoat(c,x,y,sz,f,t,false),
+  char_ferris_left:  (c,x,y,sz,f,t)=>drawCharFerrisLeft(c,x,y,sz,f,t,false),
+  char_ferris_mid:   (c,x,y,sz,f,t)=>drawCharFerrisMid(c,x,y,sz,f,t,false),
+  char_ferris_right: (c,x,y,sz,f,t)=>drawCharFerrisRight(c,x,y,sz,f,t,false),
+  char_ferris_front: (c,x,y,sz,f,t)=>drawCharFerrisFront(c,x,y,sz,f,t,false),
 };
 
 let selectedChar = 'player';
@@ -1044,7 +1052,10 @@ function buildCharSelectUI(){
 
     // 캐릭터 그리기
     const drawFn = CUSTOM_CHAR_DRAW[ch.id]||CUSTOM_CHAR_DRAW.player;
-    try{ drawFn(cc,40,52,22,0,0); }catch(e){}
+    try{
+      const previewSz=ch.id.startsWith('char_ferris')?26:22;
+      drawFn(cc,40,52,previewSz,0,0);
+    }catch(e){}
 
     const card = document.createElement('div');
     card.className='char-card'+(ch.id===selectedChar?' selected':'');
@@ -2597,6 +2608,272 @@ function drawCharTallHero(c,x,y,sz,facing,t,elite){
   c.restore();
 }
 
+
+// ═══════════════════════════════════════════════════════
+//  관람차 사진 4인 — 얼굴이 크게 보이는 캐릭터 (얼굴+몸 간략화)
+// ═══════════════════════════════════════════════════════
+
+// ── 공통: 얼굴 크게 그리기 헬퍼 ─────────────────────────
+function bigFace(c, x, y, sz, opts){
+  // opts: {skin, hair, eyeL, eyeR, browStyle, mouthStyle, extras}
+  const sk = opts.skin||'#f0d0b0';
+  const hr = opts.hair||'#0d0d10';
+  const fw = sz*0.52, fh = sz*0.55; // 얼굴 너비/높이
+
+  // 볼살 (통통한 경우)
+  if(opts.chubby){
+    [-1,1].forEach(s=>{
+      c.beginPath(); c.ellipse(s*fw*0.88, y+fh*0.05, fw*0.22, fh*0.18, 0,0,Math.PI*2);
+      c.fillStyle=sk+'88'; c.fill();
+    });
+  }
+
+  // 얼굴 본체
+  c.beginPath();
+  if(opts.chubby){
+    c.ellipse(x, y, fw*1.08, fh, 0,0,Math.PI*2);
+  } else {
+    c.ellipse(x, y, fw, fh, 0,0,Math.PI*2);
+  }
+  c.fillStyle=sk; c.fill();
+  c.strokeStyle='#c09878'; c.lineWidth=1.5; c.stroke();
+
+  // 귀
+  [-1,1].forEach(s=>{
+    const ex = opts.chubby ? fw*1.06 : fw*0.96;
+    c.beginPath(); c.ellipse(x+s*ex, y+fh*0.05, fw*0.1, fh*0.16, 0,0,Math.PI*2);
+    c.fillStyle=sk; c.fill(); c.strokeStyle='#c09878'; c.lineWidth=1; c.stroke();
+    // 이어홀
+    c.beginPath(); c.arc(x+s*ex, y+fh*0.08, fw*0.04,0,Math.PI*2);
+    c.strokeStyle='#d0a880'; c.lineWidth=0.8; c.stroke();
+  });
+
+  // 머리카락
+  // 뒷배경 (검정 덩어리)
+  c.beginPath(); c.ellipse(x, y-fh*0.55, fw*1.05, fh*0.55, 0,0,Math.PI*2);
+  c.fillStyle=hr; c.fill();
+  // 옆머리
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.ellipse(x+s*fw*0.82, y-fh*0.2, fw*0.28, fh*0.45, s*0.18,0,Math.PI*2);
+    c.fillStyle=hr; c.fill();
+  });
+  // 앞머리 (앞에 그려서 얼굴 위에 오도록)
+  if(opts.bangs === 'side'){
+    // 옆 가르마 앞머리
+    c.beginPath();
+    c.moveTo(x-fw*0.95, y-fh*0.35);
+    c.quadraticCurveTo(x-fw*0.3, y-fh*0.85, x+fw*0.1, y-fh*0.72);
+    c.quadraticCurveTo(x+fw*0.5, y-fh*0.65, x+fw*0.9, y-fh*0.45);
+    c.lineTo(x+fw*0.9, y-fh*0.15);
+    c.lineTo(x-fw*0.95, y-fh*0.25);
+    c.closePath(); c.fillStyle=hr; c.fill();
+  } else {
+    // 일자 앞머리
+    c.beginPath();
+    c.moveTo(x-fw*1.0, y-fh*0.3);
+    c.quadraticCurveTo(x, y-fh*0.95, x+fw*1.0, y-fh*0.3);
+    c.lineTo(x+fw*0.95, y-fh*0.05);
+    c.quadraticCurveTo(x, y-fh*0.72, x-fw*0.95, y-fh*0.05);
+    c.closePath(); c.fillStyle=hr; c.fill();
+  }
+}
+
+function bigEyes(c, x, y, sz, opts){
+  const fw=sz*0.52, fh=sz*0.55;
+  const ew=fw*0.22, eh=fw*0.14;
+  const eyY=y-fh*0.08;
+
+  [-1,1].forEach(s=>{
+    const ex=x+s*fw*0.38;
+    // 눈 흰자
+    c.beginPath(); c.ellipse(ex, eyY, ew, eh, 0,0,Math.PI*2);
+    c.fillStyle='#fff'; c.fill(); c.strokeStyle='#ddd'; c.lineWidth=0.5; c.stroke();
+    // 홍채
+    c.beginPath(); c.ellipse(ex, eyY, ew*0.62, ew*0.62, 0,0,Math.PI*2);
+    c.fillStyle='#1a1208'; c.fill();
+    // 눈동자
+    c.beginPath(); c.arc(ex+ew*0.12, eyY-ew*0.08, ew*0.2,0,Math.PI*2);
+    c.fillStyle='#fff'; c.fill();
+    // 쌍꺼풀 선
+    if(opts.doubleEyelid){
+      c.beginPath();
+      c.moveTo(ex-ew, eyY-eh*0.3);
+      c.quadraticCurveTo(ex, eyY-eh*1.1, ex+ew, eyY-eh*0.3);
+      c.strokeStyle='#1a120888'; c.lineWidth=sz*0.018; c.stroke();
+    }
+    // 속눈썹
+    c.beginPath();
+    c.moveTo(ex-ew, eyY); c.quadraticCurveTo(ex, eyY-eh*1.3, ex+ew, eyY);
+    c.strokeStyle='#0a0a0a'; c.lineWidth=sz*0.025; c.stroke();
+  });
+}
+
+function bigBrows(c, x, y, sz, style){
+  const fw=sz*0.52, fh=sz*0.55;
+  const by=y-fh*0.28;
+  [-1,1].forEach(s=>{
+    c.beginPath();
+    if(style==='straight'){
+      c.moveTo(x+s*fw*0.18, by); c.lineTo(x+s*fw*0.52, by-sz*0.018);
+    } else {
+      c.moveTo(x+s*fw*0.18, by+sz*0.02);
+      c.quadraticCurveTo(x+s*fw*0.35, by-sz*0.04, x+s*fw*0.52, by);
+    }
+    c.strokeStyle='#1a1208'; c.lineWidth=sz*0.038; c.lineCap='round'; c.stroke();
+  });
+}
+
+function bigNose(c, x, y, sz, opts){
+  const fh=sz*0.55;
+  c.beginPath(); c.arc(x, y+fh*0.12, sz*0.055, 0, Math.PI*2);
+  c.fillStyle='#c89868'; c.fill();
+  if(opts.wide){
+    [-1,1].forEach(s=>{
+      c.beginPath(); c.ellipse(x+s*sz*0.075, y+fh*0.14, sz*0.04, sz*0.028, 0,0,Math.PI*2);
+      c.fillStyle='#b88858'; c.fill();
+    });
+  }
+}
+
+function bigMouth(c, x, y, sz, style){
+  const fh=sz*0.55;
+  const my=y+fh*0.3;
+  if(style==='smile'){
+    c.beginPath(); c.arc(x, my-sz*0.06, sz*0.14, 0.15, Math.PI-0.15);
+    c.strokeStyle='#c07850'; c.lineWidth=sz*0.03; c.stroke();
+    // 이 (웃을 때 보임)
+    c.beginPath(); c.arc(x, my-sz*0.06, sz*0.11, 0.3, Math.PI-0.3);
+    c.fillStyle='#fff'; c.fill();
+    c.beginPath(); c.moveTo(x-sz*0.07, my-sz*0.04); c.lineTo(x+sz*0.07, my-sz*0.04);
+    c.strokeStyle='#ddd'; c.lineWidth=0.5; c.stroke();
+  } else if(style==='neutral'){
+    c.beginPath(); c.moveTo(x-sz*0.14, my); c.quadraticCurveTo(x, my+sz*0.02, x+sz*0.14, my);
+    c.strokeStyle='#b07860'; c.lineWidth=sz*0.028; c.lineCap='round'; c.stroke();
+  } else if(style==='slight'){
+    c.beginPath(); c.moveTo(x-sz*0.13, my); c.quadraticCurveTo(x, my-sz*0.04, x+sz*0.13, my);
+    c.strokeStyle='#b07860'; c.lineWidth=sz*0.028; c.lineCap='round'; c.stroke();
+  }
+}
+
+// ── 얼굴+간단한 몸 ────────────────────────────────────
+function drawFaceChar(c, x, y, sz, facing, t, faceOpts, bodyOpts){
+  const fl=Math.cos(facing||0)<0?-1:1;
+  const bob=Math.sin(t*0.16)*2;
+  c.save(); c.translate(x,y+bob);
+
+  // 간단한 몸 (얼굴이 주인공)
+  const faceY=-sz*0.05;
+  const bodyColor=bodyOpts.color||'#111';
+  const bodyColor2=bodyOpts.color2||bodyColor;
+
+  // 다리
+  [-1,1].forEach(s=>{
+    const ls=Math.sin(t*0.16)*sz*0.06*(s===1?1:-1);
+    c.beginPath(); c.roundRect(s*sz*0.1, sz*0.52+ls, sz*0.16, sz*0.42, 4);
+    c.fillStyle=bodyOpts.pantsColor||'#222'; c.fill();
+    c.beginPath(); c.ellipse(s*sz*0.14, sz*0.95+ls, sz*0.12,sz*0.06,0,0,Math.PI*2);
+    c.fillStyle='#333'; c.fill();
+  });
+
+  // 몸통
+  c.beginPath(); c.ellipse(0, sz*0.28, sz*0.36, sz*0.32, 0,0,Math.PI*2);
+  c.fillStyle=bodyColor; c.fill();
+  if(bodyOpts.outer){
+    c.beginPath(); c.ellipse(0, sz*0.25, sz*0.38, sz*0.34, 0,0,Math.PI*2);
+    c.fillStyle=bodyOpts.outer; c.fill();
+  }
+
+  // 팔
+  const armS=Math.sin(t*0.16)*0.18;
+  [-1,1].forEach(s=>{
+    c.save(); c.translate(s*sz*0.36, sz*0.18); c.rotate(s*(-0.1+armS*(s===fl?1:-1)));
+    c.beginPath(); c.roundRect(-sz*0.08,0,sz*0.16,sz*0.38,4);
+    c.fillStyle=bodyOpts.outer||bodyColor; c.fill();
+    c.beginPath(); c.ellipse(0,sz*0.38,sz*0.08,sz*0.07,0,0,Math.PI*2);
+    c.fillStyle='#e0c0a0'; c.fill(); c.restore();
+  });
+
+  // 목
+  c.beginPath(); c.rect(-sz*0.1, faceY+sz*0.52, sz*0.2, sz*0.14);
+  c.fillStyle='#e0c0a0'; c.fill();
+  if(bodyOpts.turtleneck){
+    c.beginPath(); c.rect(-sz*0.1, faceY+sz*0.46, sz*0.2, sz*0.12);
+    c.fillStyle=bodyColor; c.fill();
+  }
+
+  // 큰 얼굴 (sz*0.88 크기)
+  const bigSz = sz*0.88;
+  bigFace(c, 0, faceY, bigSz, faceOpts);
+  bigBrows(c, 0, faceY, bigSz, faceOpts.browStyle||'arch');
+  bigEyes(c, 0, faceY, bigSz, faceOpts);
+  bigNose(c, 0, faceY, bigSz, faceOpts);
+  bigMouth(c, 0, faceY, bigSz, faceOpts.mouthStyle||'neutral');
+
+  // 안경 (필요 시)
+  if(faceOpts.glasses){
+    const fw=bigSz*0.52;
+    const gY=faceY-bigSz*0.55*0.08;
+    // 둥근 안경
+    [-1,1].forEach(s=>{
+      c.beginPath(); c.arc(s*fw*0.38, gY, fw*0.22, 0, Math.PI*2);
+      c.strokeStyle=faceOpts.glassesColor||'#222'; c.lineWidth=sz*0.04; c.stroke();
+      c.fillStyle='rgba(160,220,255,0.08)'; c.fill();
+    });
+    // 코받침
+    c.beginPath(); c.moveTo(-fw*0.16, gY+fw*0.05); c.lineTo(fw*0.16, gY+fw*0.05);
+    c.strokeStyle=faceOpts.glassesColor||'#222'; c.lineWidth=sz*0.025; c.stroke();
+    // 다리
+    [-1,1].forEach(s=>{
+      c.beginPath(); c.moveTo(s*fw*0.6, gY); c.lineTo(s*fw*0.85, gY-fw*0.05);
+      c.strokeStyle=faceOpts.glassesColor||'#222'; c.lineWidth=sz*0.025; c.stroke();
+    });
+  }
+
+  c.restore();
+}
+
+// ── 4인 캐릭터 함수 ──────────────────────────────────
+
+// [왼쪽] 검정 터틀넥, 쌍꺼풀, 날카로운 인상
+function drawCharFerrisLeft(c,x,y,sz,facing,t,elite){
+  drawFaceChar(c,x,y,sz,facing,t,
+    { skin:'#f0d0b0', hair:'#0d0d10', bangs:'side',
+      browStyle:'straight', doubleEyelid:true, mouthStyle:'slight',
+      chubby:false, wide:false },
+    { color:'#111', turtleneck:true, pantsColor:'#1a1a2a' }
+  );
+}
+
+// [가운데뒤] 베이지 코트+흰 니트, 긴 얼굴
+function drawCharFerrisMid(c,x,y,sz,facing,t,elite){
+  drawFaceChar(c,x,y,sz,facing,t,
+    { skin:'#f5d8b8', hair:'#0a0a0e', bangs:'side',
+      browStyle:'arch', doubleEyelid:false, mouthStyle:'neutral',
+      chubby:false, wide:false },
+    { color:'#fff', outer:'#c8a878', pantsColor:'#2a2a3a' }
+  );
+}
+
+// [오른쪽뒤] 검정 패딩, 통통한 볼살
+function drawCharFerrisRight(c,x,y,sz,facing,t,elite){
+  drawFaceChar(c,x,y,sz,facing,t,
+    { skin:'#f2d0a8', hair:'#0c0c10', bangs:'straight',
+      browStyle:'arch', doubleEyelid:false, mouthStyle:'neutral',
+      chubby:true, wide:true },
+    { color:'#111', outer:'#1a1a1a', pantsColor:'#111' }
+  );
+}
+
+// [앞 셀카] 둥근 안경+후드, 웃는 표정, 볼살
+function drawCharFerrisFront(c,x,y,sz,facing,t,elite){
+  drawFaceChar(c,x,y,sz,facing,t,
+    { skin:'#f4d2aa', hair:'#0c0c12', bangs:'straight',
+      browStyle:'arch', doubleEyelid:false, mouthStyle:'smile',
+      chubby:true, wide:true,
+      glasses:true, glassesColor:'#111' },
+    { color:'#222', outer:'#111', pantsColor:'#111' }
+  );
+}
 // ── 플레이어: 기사 ────────────────────────────────────
 function drawCharPlayer(c,x,y,sz,facing,t){
   const f=facing||0;
