@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -4225,18 +4226,24 @@ function multiDraw(){
     if(!me) return;
     if(Math.hypot(m.x-me.x,m.y-me.y)>SIGHT_R*1.6) return;
     const sxm=m.x-camX,sym=m.y-camY;
-    const sp=SP_MAP[m.type];const sc=m.type==='boss'?3:2;
-    const spH=sp?sp.length*sc:m.size*2,spW=sp?sp[0].length*sc:m.size*2;
+    const isBoss=m.type&&m.type.startsWith('boss');
+    const dispSz=(isBoss?m.size*1.6:m.size*1.3)||16;
+    const spH=dispSz*2, spW=dispSz*2;
     ctx.save();
     if(m.warnPhase||m.enraged){ctx.shadowColor=m.enraged?'#f60':'#f44';ctx.shadowBlur=m.enraged?24:16;}
     drawMonsterSprite(ctx,m,sxm,sym);ctx.shadowBlur=0;
     const bw=Math.max(spW,36);
     ctx.fillStyle='#000a';ctx.fillRect(sxm-bw/2-1,sym-spH/2-14,bw+2,7);
-    ctx.fillStyle='#e44';ctx.fillRect(sxm-bw/2,sym-spH/2-13,bw*(m.hp/m.maxHp),5);
-    if(m.type&&m.type.startsWith('boss')){
+    ctx.fillStyle=isBoss?(m.enraged?'#f60':'#f84'):'#e44';
+    ctx.fillRect(sxm-bw/2,sym-spH/2-13,bw*(m.hp/m.maxHp),5);
+    if(isBoss){
       ctx.fillStyle=m.enraged?'#f96':'#fda';ctx.font='bold 12px Noto Sans KR';
       ctx.textAlign='center';ctx.textBaseline='bottom';
       ctx.fillText(m.enraged?'🔥 격노한 던전의 군주':'👑 던전의 군주',sxm,sym-spH/2-18);
+    } else if(m.label){
+      ctx.fillStyle='#aac';ctx.font='10px Noto Sans KR';
+      ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillText(m.label,sxm,sym-spH/2-15);
     }
     ctx.restore();
   });
@@ -4290,7 +4297,7 @@ function multiDraw(){
     if(p.id===myMultiId&&!blinking){ctx.shadowColor=PCOLORS[p.colorIdx]||'#4af';ctx.shadowBlur=10;}
     drawPlayerSprite(ctx,sxp,syp,p.facing,blinking,p.alive);
     ctx.shadowBlur=0;ctx.globalAlpha=1;
-    const pname=(p.id===myMultiId?'★ '+(window.playerNickname||p.name):p.name);
+    const pname=(p.id===myMultiId?'★ ':'')+p.name;
     ctx.fillStyle=PCOLORS[p.colorIdx]||'#aaddff';ctx.font='bold 10px Noto Sans KR';
     ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(pname,sxp,syp-22);
     const bw=36;ctx.fillStyle='#000a';ctx.fillRect(sxp-bw/2-1,syp-21,bw+2,6);
