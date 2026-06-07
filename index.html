@@ -1278,27 +1278,21 @@ canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
   mouse.x=e.clientX-rect.left;
   mouse.y=e.clientY-rect.top;
-  // 마우스 방향으로 facing 즉시 업데이트
-  if(player&&player.alive&&gameRunning){
-    player.facing=Math.atan2(
-      (mouse.y+camY)-player.y,
-      (mouse.x+camX)-player.x
-    );
+  if(multiMode){
+    // 멀티: 마우스 각도 계산
+    const me=multiState&&multiState.players&&multiState.players.find(p=>p.id===myMultiId);
+    if(me){
+      window._multiMouseAngle=Math.atan2(mouse.y-(me.y-camY), mouse.x-(me.x-camX));
+    }
+  } else {
+    // 싱글: facing 즉시 업데이트
+    if(player&&player.alive&&gameRunning){
+      player.facing=Math.atan2(
+        (mouse.y+camY)-player.y,
+        (mouse.x+camX)-player.x
+      );
+    }
   }
-});
-
-
-// 멀티 마우스 각도 추적
-canvas.addEventListener('mousemove', e=>{
-  if(!multiMode) return;
-  const rect=canvas.getBoundingClientRect();
-  // mouse 객체도 업데이트 (크로스헤어용)
-  mouse.x=e.clientX-rect.left;
-  mouse.y=e.clientY-rect.top;
-  const me=multiState&&multiState.players&&multiState.players.find(p=>p.id===myMultiId);
-  if(!me) return;
-  const sx=me.x-camX, sy=me.y-camY;
-  window._multiMouseAngle=Math.atan2(mouse.y-sy, mouse.x-sx);
 });
 
 canvas.addEventListener('mousedown',e=>{
@@ -3974,7 +3968,7 @@ function connectMultiWs(url, joinMsg){
       bullets       = [];
       bombs         = [];
       items         = [];
-      camX=0; camY=0;
+      // camX, camY는 첫 state에서 점프하므로 리셋 안 함
       tick=0;
       window._fog2=null; window._fog2C=null;
       window._charIdMap = window._charIdMap || {};
@@ -4445,19 +4439,23 @@ function multiDraw(){
     ctx.restore();
   });
 
-  // ── 내 플레이어 조준선 + 크로스헤어 (싱글과 동일) ──
+  ctx.restore(); // shake
+
+  // ── 내 플레이어 조준선 + 크로스헤어 (shake 밖에서 그려야 화면 좌표와 일치) ──
   if(me && me.alive){
     const psx=me.x-camX, psy=me.y-camY;
     const ang=window._multiMouseAngle||0;
+    const atkReady=true; // 멀티는 서버가 쿨다운 관리
     ctx.save();
-    // 조준선
-    ctx.strokeStyle='rgba(100,200,255,0.35)';
-    ctx.lineWidth=1; ctx.setLineDash([6,6]);
+    // 방향 점선 (싱글과 동일)
+    ctx.setLineDash([6,5]);
+    ctx.strokeStyle=atkReady?'rgba(100,200,255,0.55)':'rgba(100,200,255,0.2)';
+    ctx.lineWidth=1.5;
     ctx.beginPath();
     ctx.moveTo(psx+Math.cos(ang)*18, psy+Math.sin(ang)*18);
     ctx.lineTo(psx+Math.cos(ang)*200, psy+Math.sin(ang)*200);
     ctx.stroke(); ctx.setLineDash([]);
-    // 크로스헤어
+    // 크로스헤어 (싱글과 동일)
     const msx=mouse.x, msy=mouse.y;
     const cr=10;
     ctx.strokeStyle='rgba(100,220,255,0.85)';
@@ -4471,8 +4469,6 @@ function multiDraw(){
     ctx.stroke();
     ctx.restore();
   }
-
-  ctx.restore(); // shake
   drawMinimap2(Array.isArray(multiState.players)?multiState.players:[]);
   tick++;
 }
