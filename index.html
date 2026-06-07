@@ -1601,11 +1601,20 @@ function doDash(){
   if(multiMode){
     const now=Date.now();
     if(!window._multiLastDash) window._multiLastDash=0;
-    if(now-window._multiLastDash < 3000) return; // 3초 쿨다운
+    if(now-window._multiLastDash < 3000) return;
     window._multiLastDash=now;
     if(multiWs&&multiWs.readyState===1)
       multiWs.send(JSON.stringify({type:'dash'}));
-    SFX.dash();
+    // 클라이언트 즉시 예측 (싱글과 동일 물리)
+    if(player&&player.alive){
+      const ang=player.facing||0;
+      player.dashVx=Math.cos(ang)*8;
+      player.dashVy=Math.sin(ang)*8;
+      player.dashFrames=12;
+      player.dashCd=180;
+      player.iframes=20;
+    }
+    try{SFX.dash();}catch(e){}
     return;
   }
   if(!gameRunning||!player.alive) return;
@@ -2117,11 +2126,13 @@ function update(){
   // ── 시야 업데이트 (4프레임마다) ───────────────────
   if(tick%4===0) updateFog();
 
-  // ── 카메라 ───────────────────────────────────────
-  const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
-  camX+=(tx-camX)*0.1; camY+=(ty-camY)*0.1;
-  camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
-  camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
+  // ── 카메라 (싱글+멀티 공통) ──────────────────────
+  if(player){
+    const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
+    camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
+    camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
+    camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
+  }
   if(screenShake>0) screenShake--;
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
@@ -3983,16 +3994,68 @@ let rafId=null;
 let lastT=0, accumT=0;
 const FIXED_DT=1000/60; // 고정 60fps 업데이트
 
+// ── 멀티 클라이언트 업데이트 (카메라·dash·fog) ────────
+function updateMultiClient(){
+  tick++;
+  if(!player) return;
+
+  // 마우스 facing
+  if(player.alive){
+    player.facing=Math.atan2(
+      (mouse.y+camY)-player.y,
+      (mouse.x+camX)-player.x
+    );
+  }
+
+  // 구르기 물리 (클라이언트 측 예측)
+  if(player.dashFrames>0){
+    const nx=player.x+player.dashVx;
+    const ny=player.y+player.dashVy;
+    if(!isWall(nx,player.y)) player.x=nx;
+    if(!isWall(player.x,ny)) player.y=ny;
+    player.dashFrames--;
+    player.dashVx*=0.85;
+    player.dashVy*=0.85;
+  }
+  if(player.dashCd>0) player.dashCd--;
+  if(player.iframes>0) player.iframes--;
+  if(player.attackCd>0) player.attackCd--;
+  if(screenShake>0) screenShake--;
+
+  // 카메라 추적 (멀티도 동일하게)
+  if(player){
+    const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
+    camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
+    camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
+    camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
+  }
+
+  // fog 업데이트
+  if(tick%4===0) updateFog();
+
+  // 파티클
+  let pi=0;
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vx*=0.88; p.vy*=0.88; p.life--;
+    if(p.life>0) particles[pi++]=p;
+  }
+  particles.length=pi;
+
+  // HUD
+  if(tick%6===0) updateMobileSkillHUD();
+}
+
+
 function loop(t=0){
   rafId=requestAnimationFrame(loop);
   const dt=Math.min(t-lastT, 100);
   lastT=t;
 
   if(multiMode){
-    // 멀티: state를 전역변수에 주입 후 싱글 draw() 그대로 사용
-    // update()는 서버가 처리하므로 클라이언트는 draw()만
+    // 멀티: 서버가 게임 로직 처리, 클라이언트는 렌더+카메라+입력만
+    updateMultiClient(); // 카메라·dash 물리·fog 등 클라이언트 처리
     draw();
-    // 멀티 플레이어들 오버레이
     multiDrawPlayers();
     return;
   }
@@ -4601,10 +4664,12 @@ function buyShopItem(itemId){
   showShop(_shopNextStage);
 }
 
-document.getElementById('shop-close-btn').addEventListener('click',()=>{
-  document.getElementById('shop-screen').style.display='none';
+const _shopCloseBtn=document.getElementById('shop-close-btn');
+if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
+  const shopScreen=document.getElementById('shop-screen');
+  if(shopScreen) shopScreen.style.display='none';
   stage=_shopNextStage;
-  if(player) player.hp=Math.min(player.maxHp, player.hp+40); // 스테이지 진입 시 부분 회복
+  if(player) player.hp=Math.min(player.maxHp, player.hp+40);
   initGame(true);
 });
 
