@@ -191,6 +191,7 @@ function createRoom(roomName){
     bossSpawned:false,nextId:1,
     tiles:null,rooms_data:[],bossArena:null,
     MAP_W:BASE_MAP_W,MAP_H:BASE_MAP_H,COLS:0,ROWS:0,TILE,
+    items:[],
   };
   const mapData=buildMap(1);
   Object.assign(room,mapData);
@@ -202,11 +203,18 @@ function broadcastWaiting(room){
   const playerList=Object.values(room.players).map(p=>({
     id:p.id,name:p.name,colorIdx:p.colorIdx,charId:p.charId||'photo0'
   }));
+  // 아이템 pulse 업데이트 및 수명 관리
+  if(room.items){
+    room.items.forEach(it=>{ it.pulse=(it.pulse||0)+1; it.life=(it.life||600)-1; });
+    room.items=room.items.filter(it=>it.life>0);
+  }
+
   broadcastRoom(room,{type:'waiting',players:playerList,hostId:room.hostId,roomName:room.name});
 }
 
 function startGame(room){
   room.state='playing';
+  room.items=[];
   initMonsters(room);
   // 싱글과 동일하게 첫 번째 방 왼쪽 상단 근처에서 시작
   const startRoom=room.rooms_data[0];
@@ -261,7 +269,21 @@ function gameTick(room){
         if(!m.alive)continue;
         if(dist(b,m)<m.size+8){
           m.hp-=b.dmg;
-          if(m.hp<=0){m.alive=false;room.kills++;room.totalKills++;const op=room.players[b.pid];if(op)op.score+=m.score||10;}
+          if(m.hp<=0){
+            m.alive=false;room.kills++;room.totalKills++;
+            const op=room.players[b.pid];if(op)op.score+=m.score||10;
+            // 아이템 드랍 (30% 일반, 15% 무기)
+            const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
+            if(Math.random()<0.30){
+              room.items.push({id:'i'+(room.nextId++),x:m.x,y:m.y,
+                type:iTypes[Math.floor(Math.random()*iTypes.length)],pulse:0,life:600});
+            }
+            const wPool=['pistol','shotgun','rifle','smg','laser','cannon','twin'];
+            if(Math.random()<0.15){
+              room.items.push({id:'i'+(room.nextId++),x:m.x+(Math.random()-0.5)*40,y:m.y+(Math.random()-0.5)*40,
+                type:'weapon_'+wPool[Math.floor(Math.random()*wPool.length)],pulse:0,life:900});
+            }
+          }
           return false;
         }
       }
@@ -316,6 +338,7 @@ function gameTick(room){
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
     bullets:room.bullets.map(b=>({x:b.x,y:b.y,angle:b.angle,isMob:b.isMob,col:b.col||'#f44'})),
+    items:(room.items||[]).map(it=>({id:it.id,x:it.x,y:it.y,type:it.type,pulse:it.pulse||0})),
     stage:room.stage,kills:room.kills,totalKills:room.totalKills,tick:room.tick,
   });
 }
@@ -400,6 +423,18 @@ wss.on('connection',ws=>{
     }
     if(msg.type==='bomb'&&player.alive){
       for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
+    }
+    if(msg.type==='pickup'&&player.alive){
+      const it=room.items&&room.items.find(i=>i.id===msg.itemId);
+      if(it&&Math.hypot(it.x-player.x,it.y-player.y)<50){
+        room.items=room.items.filter(i=>i.id!==msg.itemId);
+        // 아이템 효과 서버에서 적용
+        if(it.type==='hp') player.hp=Math.min(player.maxHp,player.hp+40);
+        if(it.type==='shield_charge') player.shieldActive=180;
+        // 나머지(무기 등)는 클라이언트에 알림
+        broadcastRoom(room,{type:'item_pickup',pid,itemId:it.id,itemType:it.type});
+      }
+      return;
     }
     if(msg.type==='shield'&&player.alive){player.shieldActive=180;return;}
     if(msg.type==='thunder'&&player.alive){
