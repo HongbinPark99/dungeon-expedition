@@ -813,12 +813,12 @@ function startBGM(){
   stopBGM();
   try{
     const ac=_getACtx();
-    _bgmGain=ac.createGain();_bgmGain.gain.value=0.018;_bgmGain.connect(ac.destination);
+    _bgmGain=ac.createGain();_bgmGain.gain.value=0.055;_bgmGain.connect(ac.destination);
 
     // 저음 드론 베이스
     [55,82.4].forEach(function(freq){
       const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.18;
+      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.28;
       o.connect(g);g.connect(_bgmGain);o.start();_bgmOscs.push(o);
     });
 
@@ -835,7 +835,7 @@ function startBGM(){
         const o=ac.createOscillator(),g=ac.createGain();
         o.type='triangle';o.frequency.value=melody[b];
         const t=ac.currentTime;
-        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.22,t+0.04);
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.38,t+0.04);
         g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*1.8);
         o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*2);
       }
@@ -848,7 +848,7 @@ function startBGM(){
         const o=ac.createOscillator(),g=ac.createGain();
         o.type='sine';o.frequency.value=bass[b];
         const t=ac.currentTime;
-        g.gain.setValueAtTime(0.3,t);g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*3.5);
+        g.gain.setValueAtTime(0.45,t);g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*3.5);
         o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*4);
       }
       beat++;
@@ -861,7 +861,7 @@ function stopBGM(){
   _bgmOscs=[];
   if(_bgmGain){try{_bgmGain.disconnect();}catch(e){}_bgmGain=null;}
 }
-function setBGMStage(s){if(_bgmGain)_bgmGain.gain.value=0.015+Math.min(s,5)*0.003;}
+function setBGMStage(s){if(_bgmGain)_bgmGain.gain.value=0.045+Math.min(s,5)*0.008;}
 function addMuteButton(){
   if(document.getElementById('mute-btn'))return;
   const btn=document.createElement('button');
@@ -1616,11 +1616,11 @@ function doAttack(){
   if(multiMode){
     const now=Date.now();
     if(!window._multiLastAttack) window._multiLastAttack=0;
-    if(now-window._multiLastAttack < 400) return; // 싱글 sword cd(36frames≈600ms)에 맞춤
+    if(now-window._multiLastAttack < 400) return;
     window._multiLastAttack=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'attack'}));
-      SFX.shoot();
+      try{_getACtx();SFX.shoot();}catch(e){}
     }
     return;
   }
@@ -1628,7 +1628,7 @@ function doAttack(){
   const wp=WEAPONS[player.weapon]||WEAPONS.sword;
   player.attackCd=wp.cd;
   const angle=player.facing!==undefined?player.facing:0;
-  SFX.shoot();
+  try{_getACtx();SFX.shoot();}catch(e){}
   for(let i=0;i<wp.count;i++){
     const sp=wp.count>1?((i-(wp.count-1)/2)*wp.spread*1.1):(Math.random()-0.5)*wp.spread;
     const a=angle+sp;
@@ -2139,11 +2139,12 @@ function update(){
         :entries.map(([t,n])=>`<div class="it-row">${ITEM_EMOJI[t]} x${n}</div>`).join('');
     }
   }
-  if(boss){
+  if(boss && player.alive && gameRunning){
+    document.getElementById('boss-bar').style.display='block';
     document.getElementById('boss-hp-fill').style.width=(boss.hp/boss.maxHp*100)+'%';
     document.getElementById('boss-title').textContent=
-      (boss.enraged?'🔥 ':'👑 ')+'던전의 군주'+(boss.enraged?' [격노]':'');
-  } else if(bossSpawned&&bossDefeated){
+      (boss.enraged?'🔥 ':'👑 ')+(boss.label||'던전의 군주')+(boss.enraged?' [격노]':'');
+  } else {
     document.getElementById('boss-bar').style.display='none';
   }
 }
@@ -3439,26 +3440,125 @@ function drawCharFerrisFront(c,x,y,sz,facing,t,elite){
 }
 
 
-// ── 보스 대체 함수 (기존 drawCharBoss 삭제됨 → 관람차 캐릭터 크게) ──
+// ── 보스 픽셀아트 (스테이지별 완전 다른 생김새) ─────
 function drawBossReplace(c,x,y,sz,f,t,enraged,type){
-  // 보스 타입별로 다른 관람차 캐릭터 사용
-  const bossMap={
-    boss:  drawCharFerrisLeft,
-    boss2: drawCharFerrisMid,
-    boss3: drawCharFerrisRight,
-    boss4: drawCharFerrisFront,
-    boss5: drawCharFerrisLeft,
-  };
-  const fn=bossMap[type]||drawCharFerrisLeft;
-  fn(c,x,y,sz,f,t,enraged);
-  // 격노 효과
-  if(enraged){
-    c.save();
-    c.globalAlpha=0.3+0.15*Math.sin(t*0.15);
-    c.strokeStyle='#ff4400'; c.lineWidth=3;
-    c.beginPath(); c.arc(x,y,sz*0.65,0,Math.PI*2); c.stroke();
-    c.restore();
+  const s=Math.max(2,sz*0.22)|0;
+  const pulse=0.92+0.08*Math.sin(t*0.08);
+  const ox=x-7*s, oy=y-9*s;
+  c.save();
+  c.imageSmoothingEnabled=false;
+
+  if(type==='boss'){
+    // ─ 스테이지1: 던전의 군주 (갈색 해골왕, 왕관) ─
+    const crown=enraged?'#ff8800':'#ffd700';
+    const bone=enraged?'#ffe0a0':'#d4b896';
+    const dark='#8b6040'; const eye='#ff0000';
+    // 왕관
+    px(c,ox+s,oy,s,2*s,crown); px(c,ox+3*s,oy-s,2*s,3*s,crown); px(c,ox+6*s,oy,s,2*s,crown);
+    px(c,ox,oy+s,8*s,s,crown);
+    // 머리
+    px(c,ox,oy+2*s,8*s,6*s,bone);
+    px(c,ox+s,oy+3*s,2*s,2*s,eye); px(c,ox+5*s,oy+3*s,2*s,2*s,eye); // 눈
+    px(c,ox+s,oy+7*s,6*s,s,dark); // 입
+    px(c,ox+2*s,oy+7*s,s,s,'#fff'); px(c,ox+4*s,oy+7*s,s,s,'#fff'); px(c,ox+6*s,oy+7*s,s,s,'#fff');
+    // 몸통
+    px(c,ox+s,oy+8*s,6*s,5*s,dark);
+    px(c,ox,oy+9*s,s,3*s,bone); px(c,ox+7*s,oy+9*s,s,3*s,bone); // 팔
+    // 다리
+    px(c,ox+s,oy+13*s,3*s,3*s,dark); px(c,ox+4*s,oy+13*s,3*s,3*s,dark);
+
+  } else if(type==='boss2'){
+    // ─ 스테이지2: 암흑 군주 (보라빛 망령, 눈만 보임) ─
+    const col=enraged?'#dd00ff':'#9900cc'; const glow=enraged?'#ff88ff':'#cc66ff';
+    const dark2='#220033'; const eyeC='#ffffff';
+    // 망토 (물결 형태)
+    px(c,ox+2*s,oy,4*s,s,col);
+    px(c,ox+s,oy+s,6*s,s,col);
+    px(c,ox,oy+2*s,8*s,8*s,col);
+    px(c,ox+s,oy+10*s,6*s,s,col);
+    // 내부 어둠
+    px(c,ox+s,oy+3*s,6*s,4*s,dark2);
+    // 눈 (빛남)
+    px(c,ox+2*s,oy+4*s,s,2*s,eyeC); px(c,ox+5*s,oy+4*s,s,2*s,eyeC);
+    px(c,ox+2*s,oy+4*s,s,s,glow); px(c,ox+5*s,oy+4*s,s,s,glow);
+    // 물결 밑단
+    for(let i=0;i<4;i++) px(c,ox+i*2*s,oy+11*s,s,s+Math.floor(Math.sin(t*0.15+i)*s),col);
+    // 촉수
+    px(c,ox-s,oy+5*s,s,4*s,col); px(c,ox+8*s,oy+5*s,s,4*s,col);
+
+  } else if(type==='boss3'){
+    // ─ 스테이지3: 빙하 군주 (얼음 골렘, 파란색) ─
+    const ice=enraged?'#88eeff':'#aaddff'; const crystal='#ffffff'; const dark3='#004466';
+    // 얼음 결정 머리 (각진 형태)
+    px(c,ox+2*s,oy,4*s,s,crystal);
+    px(c,ox+s,oy+s,6*s,2*s,ice);
+    px(c,ox,oy+3*s,8*s,4*s,ice);
+    // 눈 (검은 구멍)
+    px(c,ox+s,oy+4*s,2*s,2*s,dark3); px(c,ox+5*s,oy+4*s,2*s,2*s,dark3);
+    // 얼음 결정 돌기
+    px(c,ox-s,oy+s,s,3*s,crystal); px(c,ox+8*s,oy+s,s,3*s,crystal);
+    px(c,ox,oy,s,s,ice); px(c,ox+7*s,oy,s,s,ice);
+    // 두꺼운 몸통
+    px(c,ox,oy+7*s,8*s,6*s,ice);
+    px(c,ox+s,oy+8*s,6*s,4*s,crystal);
+    // 팔 (얼음 블록)
+    px(c,ox-2*s,oy+7*s,2*s,4*s,ice); px(c,ox+8*s,oy+7*s,2*s,4*s,ice);
+    // 다리
+    px(c,ox,oy+13*s,3*s,3*s,dark3); px(c,ox+5*s,oy+13*s,3*s,3*s,dark3);
+
+  } else if(type==='boss4'){
+    // ─ 스테이지4: 번개 군주 (전기 마왕, 노란색) ─
+    const bolt=enraged?'#ffffff':'#ffee00'; const body='#ff8800'; const spark='#ffff00';
+    // 번개 뿔
+    px(c,ox+s,oy-2*s,s,3*s,bolt); px(c,ox+6*s,oy-2*s,s,3*s,bolt);
+    px(c,ox+2*s,oy-s,s,s,bolt); px(c,ox+5*s,oy-s,s,s,bolt);
+    // 머리
+    px(c,ox,oy,8*s,6*s,body);
+    px(c,ox+s,oy+s,2*s,2*s,spark); px(c,ox+5*s,oy+s,2*s,2*s,spark); // 눈
+    // 번개 패턴 (몸통)
+    px(c,ox,oy+6*s,8*s,7*s,body);
+    px(c,ox+3*s,oy+7*s,2*s,5*s,bolt); // 번개 무늬
+    px(c,ox+2*s,oy+9*s,s,s,bolt); px(c,ox+5*s,oy+9*s,s,s,bolt);
+    // 날개
+    px(c,ox-2*s,oy+6*s,2*s,3*s,bolt); px(c,ox+8*s,oy+6*s,2*s,3*s,bolt);
+    // 다리
+    px(c,ox+s,oy+13*s,2*s,3*s,body); px(c,ox+5*s,oy+13*s,2*s,3*s,body);
+
+  } else if(type==='boss5'){
+    // ─ 스테이지5: 마왕 (암흑 드래곤, 빨간+검정) ─
+    const scale=enraged?'#ff2200':'#cc0000'; const wing='#880000'; const claw='#ffaa00';
+    // 날개 (넓게)
+    px(c,ox-3*s,oy+2*s,3*s,6*s,wing); px(c,ox+8*s,oy+2*s,3*s,6*s,wing);
+    px(c,ox-4*s,oy+3*s,s,4*s,wing); px(c,ox+11*s,oy+3*s,s,4*s,wing);
+    // 뿔
+    px(c,ox+s,oy-3*s,s,4*s,'#333'); px(c,ox+6*s,oy-3*s,s,4*s,'#333');
+    px(c,ox+2*s,oy-s,s,s,claw); px(c,ox+5*s,oy-s,s,s,claw);
+    // 머리 (용 형태)
+    px(c,ox,oy,8*s,5*s,scale);
+    px(c,ox+s,oy+s,2*s,2*s,claw); px(c,ox+5*s,oy+s,2*s,2*s,claw); // 눈
+    px(c,ox,oy+4*s,8*s,s,'#ff4400'); // 불꽃 입
+    // 몸통 (비늘 패턴)
+    px(c,ox,oy+5*s,8*s,8*s,scale);
+    for(let i=0;i<4;i++) px(c,ox+i*2*s,oy+6*s,s,s,wing); // 비늘
+    for(let i=0;i<4;i++) px(c,ox+i*2*s+s,oy+8*s,s,s,wing);
+    // 꼬리
+    px(c,ox+5*s,oy+13*s,4*s,s,scale); px(c,ox+7*s,oy+14*s,3*s,s,scale);
+    // 발
+    px(c,ox,oy+13*s,3*s,3*s,scale); px(c,ox+4*s,oy+13*s,3*s,3*s,scale);
+    px(c,ox-s,oy+15*s,2*s,s,claw); px(c,ox+4*s,oy+15*s,2*s,s,claw); // 발톱
   }
+
+  // 공통: 격노 오라 효과
+  if(enraged){
+    c.globalAlpha=0.25+0.1*Math.sin(t*0.12);
+    c.strokeStyle=type==='boss5'?'#ff0000':type==='boss4'?'#ffff00':type==='boss3'?'#00ffff':type==='boss2'?'#ff00ff':'#ff4400';
+    c.lineWidth=4;
+    c.beginPath(); c.arc(x,y,sz*0.7*pulse,0,Math.PI*2); c.stroke();
+    c.globalAlpha=0.1;
+    c.fillStyle=c.strokeStyle;
+    c.beginPath(); c.arc(x,y,sz*0.7*pulse,0,Math.PI*2); c.fill();
+  }
+  c.restore();
 }
 // ── 캐릭터 타입 → 드로우 함수 매핑 ──────────────────
 const CHAR_DRAW = {
@@ -3836,6 +3936,7 @@ function showStageCleared(){
 }
 
 function showEnding(won){
+  document.getElementById('boss-bar').style.display='none';
   const ov=document.getElementById('ending');
   const title=document.getElementById('end-title');
   const msg=document.getElementById('end-msg');
@@ -4075,7 +4176,7 @@ function connectMultiWs(url, joinMsg){
       window._multiLastDash=0;
       // BGM 시작 (싱글과 동일)
       startBGM(); setBGMStage(1);
-      if(_bgmGain) _bgmGain.gain.value=0.008; // 멀티 BGM 낮게
+      if(_bgmGain) _bgmGain.gain.value=0.035; // 멀티 BGM
       addMuteButton();
       // HUD 세팅
       updateMultiHUD([]);
@@ -4470,7 +4571,8 @@ function multiDraw(){
     if(isBoss){
       ctx.fillStyle=m.enraged?'#f96':'#fda';ctx.font='bold 12px Noto Sans KR';
       ctx.textAlign='center';ctx.textBaseline='bottom';
-      ctx.fillText(m.enraged?'🔥 격노한 던전의 군주':'👑 던전의 군주',sxm,sym-spH/2-18);
+      const _bl=m.label||'던전의 군주';
+      ctx.fillText(m.enraged?`🔥 격노한 ${_bl}`:`👑 ${_bl}`,sxm,sym-spH/2-18);
     } else if(m.label){
       ctx.fillStyle='#aac';ctx.font='10px Noto Sans KR';
       ctx.textAlign='center';ctx.textBaseline='bottom';
