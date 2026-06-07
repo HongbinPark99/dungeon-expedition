@@ -380,10 +380,7 @@ canvas{display:block;cursor:none;}
   <div style="display:flex;flex-direction:column;align-items:center;gap:10px;
     background:#0b0d1e;border:1px solid #2a2d50;border-radius:12px;padding:18px 28px;">
     <div style="font-family:'Black Han Sans',sans-serif;font-size:.9rem;color:#d4a832;letter-spacing:2px">🌐 멀티플레이어 (최대 3인)</div>
-    <input id="server-url" placeholder="wss://dungeon-expedition.onrender.com" value="wss://dungeon-expedition.onrender.com"
-      style="background:#0d0f20;border:1px solid #3a3d60;border-radius:8px;
-      padding:8px 14px;color:#eee;font-size:.82rem;font-family:inherit;
-      text-align:center;width:280px;"/>
+    <input id="server-url" type="hidden" value="wss://dungeon-expedition.onrender.com"/>
 
     <!-- 방 만들기 -->
     <div style="display:flex;gap:8px;align-items:center;">
@@ -3585,14 +3582,16 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive, colorIdx, charId){
     char_ferris_right:'ferris_right', char_ferris_front:'ferris_front',
     photo0:'photo0', photo1:'photo1', photo2:'photo2', photo3:'photo3', photo4:'photo4',
   };
-  // 싱글/멀티 모두 선택한 사진 캐릭터 사용
-  const cid = charId || (multiMode ? null : selectedChar) || 'photo0';
+  // charId 결정: 전달된 charId → charIdMap → selectedChar → 기본값
+  const cid = charId || (window._charIdMap&&window._charIdMap[window._drawingPid]) || selectedChar || 'photo0';
   const key = photoMap[cid] || cid || 'photo0';
-  const img = PHOTO_IMGS[key];
+  // PHOTO_IMGS에 없으면 photo0 폴백
+  const img = PHOTO_IMGS[key] || PHOTO_IMGS['photo0'];
   if(img && img.complete && img.naturalWidth){
     drawPhotoChar(c, key, sx, sy+bob, 26, '#1a1a2a', blinking&&alive);
+  } else if(PHOTO_IMGS['photo0'] && PHOTO_IMGS['photo0'].complete){
+    drawPhotoChar(c, 'photo0', sx, sy+bob, 26, '#1a1a2a', blinking&&alive);
   } else {
-    // 이미지 로드 전이거나 없으면 colorIdx 픽셀아트로 폴백
     drawPixelPlayer(c, sx, sy+bob, colorIdx||0, blinking&&alive);
   }
   c.globalAlpha=1;
@@ -3910,8 +3909,9 @@ function connectMultiWs(url, joinMsg){
       multiMode=true;
       window._lastRoomId=msg.roomId;
       window._isHost=msg.isHost;
-      // 내 charId 저장 (서버에서 에코)
-      if(msg.charId) window._myCharId=msg.charId;
+      // charId 맵 초기화 + 내 캐릭터 등록
+      window._charIdMap = window._charIdMap || {};
+      window._charIdMap[msg.pid] = msg.charId || selectedChar || 'photo0';
 
       // 맵 데이터 미리 저장
       tiles=new Uint8Array(msg.tiles);
@@ -3930,6 +3930,9 @@ function connectMultiWs(url, joinMsg){
 
     // ── 대기실 참가자 목록 업데이트 ──
     if(msg.type==='waiting'){
+      // 모든 플레이어 charId 맵 업데이트
+      window._charIdMap = window._charIdMap || {};
+      if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       renderWaitingPlayers(msg.players, msg.hostId);
       renderWaitingHostArea(msg.hostId===myMultiId);
       return;
@@ -3969,6 +3972,9 @@ function connectMultiWs(url, joinMsg){
     // ── 게임 상태 수신 ──
     if(msg.type==='state'){
       multiState=msg;
+      // charId 맵 갱신
+      window._charIdMap = window._charIdMap || {};
+      if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       // 첫 state 수신 시 카메라 즉시 점프
       if(tick===0||tick===1){
         const _me=msg.players&&msg.players.find(p=>p.id===myMultiId);
@@ -4256,7 +4262,7 @@ function multiDraw(){
   });
 
   // 총알
-  (multiState.bullets||[]).forEach(b=>{
+  (Array.isArray(multiState.bullets)?multiState.bullets:[]).forEach(b=>{
     const sxb=b.x-camX,syb=b.y-camY;
     const blen=b.len||24,tailX=sxb-Math.cos(b.angle)*blen,tailY=syb-Math.sin(b.angle)*blen;
     ctx.save();
@@ -4277,7 +4283,7 @@ function multiDraw(){
   });
 
   // 폭탄
-  (multiState.bombs||[]).forEach(b=>{
+  (Array.isArray(multiState.bombs)?multiState.bombs:[]).forEach(b=>{
     const sxb=b.x-camX,syb=b.y-camY;ctx.save();
     if(b.exploded){
       const t=b.explodeTimer/20;ctx.globalAlpha=(1-t)*0.7;ctx.fillStyle='#f84';
@@ -4304,7 +4310,7 @@ function multiDraw(){
   }
 
   // 아이템
-  (multiState.items||[]).forEach(it=>{
+  (Array.isArray(multiState.items)?multiState.items:[]).forEach(it=>{
     if(!me) return;
     if(Math.hypot(it.x-me.x,it.y-me.y)>SIGHT_R*1.2) return;
     const sxi=it.x-camX,syi=it.y-camY;
@@ -4395,7 +4401,9 @@ function multiDraw(){
     }
     ctx.globalAlpha=!p.alive?0.3:blinking?0.45:1;
     if(p.id===myMultiId&&!blinking){ctx.shadowColor=PCOLORS[p.colorIdx]||'#4af';ctx.shadowBlur=10;}
-    drawPlayerSprite(ctx,sxp,syp,p.facing,blinking,p.alive,p.colorIdx,p.charId);
+    window._drawingPid=p.id;
+    drawPlayerSprite(ctx,sxp,syp,p.facing,blinking,p.alive,p.colorIdx,p.charId||(window._charIdMap&&window._charIdMap[p.id])||'photo0');
+    window._drawingPid=null;
     ctx.shadowBlur=0;ctx.globalAlpha=1;
     const pname=(p.id===myMultiId?'★ ':'')+p.name;
     ctx.fillStyle=PCOLORS[p.colorIdx]||'#aaddff';ctx.font='bold 10px Noto Sans KR';
