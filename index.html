@@ -1023,12 +1023,12 @@ const CHAR_LIST = [
 
 // 커스텀 캐릭터 드로우 함수 맵
 const CUSTOM_CHAR_DRAW = {
-  player:         (c,x,y,sz,f,t)=>drawCharPlayer(c,x,y,sz,f,t),
-  char_headphone: (c,x,y,sz,f,t)=>drawCharPlayer(c,x,y,sz,f,t), // 같은 함수 (헤드폰)
+  player:         (c,x,y,sz,f,t)=>drawCharFerrisLeft(c,x,y,sz,f,t,false),
+  char_headphone: (c,x,y,sz,f,t)=>drawCharFerrisLeft(c,x,y,sz,f,t,false), // 같은 함수 (헤드폰)
   char_cap:       (c,x,y,sz,f,t)=>drawCharArcherFriend(c,x,y,sz,f,t,false),
   char_thumbsup:  (c,x,y,sz,f,t)=>drawCharMageFriend(c,x,y,sz,f,t,false),
   char_tall:      (c,x,y,sz,f,t)=>drawCharTallHero(c,x,y,sz,f,t,false),
-  char_longcoat:  (c,x,y,sz,f,t)=>drawCharLongcoat(c,x,y,sz,f,t,false),
+  char_longcoat:  (c,x,y,sz,f,t)=>drawCharFerrisMid(c,x,y,sz,f,t,false),
   char_ferris_left:  (c,x,y,sz,f,t)=>drawCharFerrisLeft(c,x,y,sz,f,t,false),
   char_ferris_mid:   (c,x,y,sz,f,t)=>drawCharFerrisMid(c,x,y,sz,f,t,false),
   char_ferris_right: (c,x,y,sz,f,t)=>drawCharFerrisRight(c,x,y,sz,f,t,false),
@@ -3121,33 +3121,65 @@ function drawCharFerrisFront(c,x,y,sz,facing,t,elite){
   c.restore();
 }
 
+
+// ── 보스 대체 함수 (기존 drawCharBoss 삭제됨 → 관람차 캐릭터 크게) ──
+function drawBossReplace(c,x,y,sz,f,t,enraged,type){
+  // 보스 타입별로 다른 관람차 캐릭터 사용
+  const bossMap={
+    boss:  drawCharFerrisLeft,
+    boss2: drawCharFerrisMid,
+    boss3: drawCharFerrisRight,
+    boss4: drawCharFerrisFront,
+    boss5: drawCharFerrisLeft,
+  };
+  const fn=bossMap[type]||drawCharFerrisLeft;
+  fn(c,x,y,sz,f,t,enraged);
+  // 격노 효과
+  if(enraged){
+    c.save();
+    c.globalAlpha=0.3+0.15*Math.sin(t*0.15);
+    c.strokeStyle='#ff4400'; c.lineWidth=3;
+    c.beginPath(); c.arc(x,y,sz*0.65,0,Math.PI*2); c.stroke();
+    c.restore();
+  }
+}
 // ── 캐릭터 타입 → 드로우 함수 매핑 ──────────────────
 const CHAR_DRAW = {
-  // ── 커스텀 4인방 캐릭터 ──
-  player:    (c,x,y,sz,f,t,e)=>drawCharPlayer(c,x,y,sz,f,t),
-  // 추가 플레이어 스킨 (몬스터 타입에 할당)
-  goblin:    drawCharGoblin,
+  // ── 플레이어 스킨 ──────────────────────────────────
+  player:    (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e),
+  char_headphone:   (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e),
+  char_cap:         (c,x,y,sz,f,t,e)=>drawCharArcherFriend(c,x,y,sz,f,t,e),
+  char_thumbsup:    (c,x,y,sz,f,t,e)=>drawCharMageFriend(c,x,y,sz,f,t,e),
+  char_tall:        (c,x,y,sz,f,t,e)=>drawCharTallHero(c,x,y,sz,f,t,e),
+  char_longcoat:    (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e||false),
+  char_ferris_left: (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e||false),
+  char_ferris_mid:  (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e||false),
+  char_ferris_right:(c,x,y,sz,f,t,e)=>drawCharFerrisRight(c,x,y,sz,f,t,e||false),
+  char_ferris_front:(c,x,y,sz,f,t,e)=>drawCharFerrisFront(c,x,y,sz,f,t,e||false),
+
+  // ── 몬스터 — 존재하는 함수로만 매핑 ────────────────
+  goblin:    (c,x,y,sz,f,t,e)=>drawCharFerrisRight(c,x,y,sz,f,t,e),   // 통통 얼굴
   skeleton:  (c,x,y,sz,f,t,e)=>drawCharArcherFriend(c,x,y,sz,f,t,e),
-  slime:     (c,x,y,sz,f,t,e)=>drawCharSlime(c,x,y,sz,f,t,e),
-  orc:       drawCharOrc,
-  archer:    drawCharArcher,
-  shade:     drawCharShade,
-  berserker: drawCharBerserker,
-  mage:      drawCharMage,
-  hunter:    drawCharHunter,
-  bomber:    drawCharHunter,   // 헌터 베이스
+  slime:     (c,x,y,sz,f,t,e)=>drawCharFerrisFront(c,x,y,sz,f,t,e),   // 웃는 얼굴
+  orc:       (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e),    // 날카로운 인상
+  archer:    (c,x,y,sz,f,t,e)=>drawCharArcher(c,x,y,sz,f,t,e),
+  shade:     (c,x,y,sz,f,t,e)=>drawCharArcherFriend(c,x,y,sz,f,t,e),
+  berserker: (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e),     // 무표정
+  mage:      (c,x,y,sz,f,t,e)=>drawCharMage(c,x,y,sz,f,t,e),
+  hunter:    (c,x,y,sz,f,t,e)=>drawCharMageFriend(c,x,y,sz,f,t,e),
+  bomber:    (c,x,y,sz,f,t,e)=>drawCharTallHero(c,x,y,sz,f,t,e),
   vampire:   (c,x,y,sz,f,t,e)=>drawCharMageFriend(c,x,y,sz,f,t,e),
-  golem:     drawCharGolem,
-  wraith:    (c,x,y,sz,f,t,e)=>drawCharLongcoat(c,x,y,sz,f,t,e||false),
-  hydra:     drawCharDragon,   // 드래곤 베이스
-  lich:      drawCharLich,
-  dragon:    drawCharDragon,
-  demon:     drawCharDemon,
-  boss:      (c,x,y,sz,f,t,enraged)=>drawCharBoss(c,x,y,sz,f,t,enraged,'boss'),
-  boss2:     (c,x,y,sz,f,t,enraged)=>drawCharBoss(c,x,y,sz,f,t,enraged,'boss2'),
-  boss3:     (c,x,y,sz,f,t,enraged)=>drawCharBoss(c,x,y,sz,f,t,enraged,'boss3'),
-  boss4:     (c,x,y,sz,f,t,enraged)=>drawCharBoss(c,x,y,sz,f,t,enraged,'boss4'),
-  boss5:     (c,x,y,sz,f,t,enraged)=>drawCharBoss(c,x,y,sz,f,t,enraged,'boss5'),
+  golem:     (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e),
+  wraith:    (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e||false),
+  hydra:     (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e),
+  lich:      (c,x,y,sz,f,t,e)=>drawCharFerrisLeft(c,x,y,sz,f,t,e),
+  dragon:    (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e),
+  demon:     (c,x,y,sz,f,t,e)=>drawCharFerrisRight(c,x,y,sz,f,t,e),
+  boss:      (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss'),
+  boss2:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss2'),
+  boss3:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss3'),
+  boss4:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss4'),
+  boss5:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss5'),
 };
 
 // ── 몬스터 그리기 래퍼 ───────────────────────────────
@@ -3173,7 +3205,7 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive){
   else { c.globalAlpha=1; }
   const sz=22;
   // 선택된 캐릭터 사용
-  const drawFn = (window._activePlayerDraw)||((cc,x,y,s,f,t)=>drawCharPlayer(cc,x,y,s,f,t));
+  const drawFn = (window._activePlayerDraw)||((cc,x,y,s,f,t)=>drawCharFerrisLeft(cc,x,y,s,f,t));
   const key='player_'+selectedChar;
   // 캐시 활용
   const facingDir=Math.cos(facing||0)<0?1:0;
