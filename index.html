@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -3721,8 +3722,12 @@ function setMultiStatus(msg){ document.getElementById('multi-status').textConten
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
 function getServerUrl(){
   const raw=(document.getElementById('server-url').value.trim());
+  if(!raw) return '';
   // https→wss, http→ws 자동 변환
-  return raw.replace(/^https:/,'wss:').replace(/^http:/,'ws:');
+  let url = raw.replace(/^https:/,'wss:').replace(/^http:/,'ws:');
+  // wss:// 로 시작 안 하면 앞에 붙이기
+  if(!url.startsWith('wss://') && !url.startsWith('ws://')) url = 'wss://'+url;
+  return url;
 }
 
 // ── 방 목록 새로고침 ──────────────────────────────────
@@ -3772,7 +3777,7 @@ document.getElementById('create-room-btn').addEventListener('click',()=>{
   window.playerNickname=getNickname();
   const url=getServerUrl();
   if(!url){ setMultiStatus('❌ 서버 URL을 입력해주세요'); return; }
-  const roomName=(document.getElementById('room-name-input').value.trim())||`${window.playerNickname}의 방`;
+  const roomName=(document.getElementById('room-name-input').value.trim())||(window.playerNickname+'의 방');
   connectMultiWs(url, {type:'create_room', name:window.playerNickname, roomName});
 });
 
@@ -3781,7 +3786,8 @@ function joinRoom(roomId){
   window.playerNickname=getNickname();
   const url=getServerUrl();
   if(!url){ setMultiStatus('❌ 서버 URL을 입력해주세요'); return; }
-  connectMultiWs(url, {type:'join_room', roomId, name:window.playerNickname});
+  window._lastRoomId=roomId;
+  connectMultiWs(url, {type:'join_room', roomId:roomId, name:window.playerNickname});
 }
 
 // ── WebSocket 연결 ────────────────────────────────────
@@ -3809,8 +3815,9 @@ function connectMultiWs(url, joinMsg){
       setMultiStatus(`✅ "${msg.roomName||msg.name}" 입장 완료!`);
 
       tiles=new Uint8Array(msg.tiles);
+      MAP_W=msg.mapW; MAP_H=msg.mapH;
+      COLS=Math.round(MAP_W/TILE); ROWS=Math.round(MAP_H/TILE);
       explored=new Uint8Array(COLS*ROWS);
-      mapW=msg.mapW; mapH=msg.mapH;
       bossArena=msg.bossArena;
 
       document.getElementById('lobby').style.display='none';
