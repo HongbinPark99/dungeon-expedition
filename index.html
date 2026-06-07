@@ -177,7 +177,7 @@ canvas{display:block;cursor:none;}
   display:flex;gap:10px;flex-wrap:wrap;justify-content:center;
 }
 .char-card{
-  width:76px;cursor:pointer;border-radius:10px;
+  width:92px;cursor:pointer;border-radius:10px;
   border:2px solid #2a2d50;background:#0d0f20;
   padding:6px 4px;text-align:center;transition:.15s;
   user-select:none;
@@ -487,7 +487,7 @@ const P_SPEED = 2.0;
 const P_HP    = 120;
 const P_ATK   = 32;
 const P_RANGE = 68;
-const P_CD    = 22;
+const P_CD    = 36;
 const IFRAMES = 48;
 const BULLET_SPEED = 10;
 const BULLET_LEN   = 24;
@@ -495,14 +495,14 @@ const BULLET_RANGE = 360;
 
 // ── 무기 정의 ──────────────────────────────────────────
 const WEAPONS = {
-  sword:   { id:'sword',  name:'기본 검',    emoji:'🗡',  cd:22,  dmg:32, spd:10, range:360, spread:0,   count:1, pierce:false, desc:'기본 근접 공격',      col:'#88ddff' },
-  pistol:  { id:'pistol', name:'권총',       emoji:'🔫',  cd:18,  dmg:22, spd:13, range:420, spread:0.1, count:1, pierce:false, desc:'빠른 단발 권총',       col:'#ffdd44' },
-  shotgun: { id:'shotgun',name:'산탄총',     emoji:'💥',  cd:45,  dmg:28, spd:9,  range:260, spread:0.35,count:5, pierce:false, desc:'5발 산탄 — 근거리 강력',col:'#ff8844' },
-  rifle:   { id:'rifle',  name:'저격 소총',  emoji:'🎯',  cd:55,  dmg:70, spd:18, range:700, spread:0,   count:1, pierce:true,  desc:'관통 · 고데미지',      col:'#44ff88' },
-  smg:     { id:'smg',    name:'기관단총',   emoji:'⚡',  cd:10,   dmg:12, spd:12, range:320, spread:0.18,count:1, pierce:false, desc:'초고속 연사',           col:'#aaaaff' },
-  laser:   { id:'laser',  name:'레이저',     emoji:'🔴',  cd:35,  dmg:55, spd:22, range:600, spread:0,   count:1, pierce:true,  desc:'고속 관통 레이저',     col:'#ff2244' },
-  cannon:  { id:'cannon', name:'캐논',       emoji:'💣',  cd:90,  dmg:120,spd:7,  range:380, spread:0,   count:1, pierce:false, desc:'초고데미지 단발',       col:'#ff6600' },
-  twin:    { id:'twin',   name:'쌍권총',     emoji:'🔫',  cd:14,  dmg:18, spd:12, range:380, spread:0.08,count:2, pierce:false, desc:'2발 동시 발사',         col:'#ffaa00' },
+  sword:   { id:'sword',  name:'기본 검',    emoji:'🗡',  cd:36,  dmg:32, spd:10, range:360, spread:0,   count:1, pierce:false, desc:'기본 근접 공격',      col:'#88ddff' },
+  pistol:  { id:'pistol', name:'권총',       emoji:'🔫',  cd:30,  dmg:22, spd:13, range:420, spread:0.1, count:1, pierce:false, desc:'빠른 단발 권총',       col:'#ffdd44' },
+  shotgun: { id:'shotgun',name:'산탄총',     emoji:'💥',  cd:65,  dmg:28, spd:9,  range:260, spread:0.35,count:5, pierce:false, desc:'5발 산탄 — 근거리 강력',col:'#ff8844' },
+  rifle:   { id:'rifle',  name:'저격 소총',  emoji:'🎯',  cd:80,  dmg:70, spd:18, range:700, spread:0,   count:1, pierce:true,  desc:'관통 · 고데미지',      col:'#44ff88' },
+  smg:     { id:'smg',    name:'기관단총',   emoji:'⚡',  cd:18,   dmg:12, spd:12, range:320, spread:0.18,count:1, pierce:false, desc:'초고속 연사',           col:'#aaaaff' },
+  laser:   { id:'laser',  name:'레이저',     emoji:'🔴',  cd:55,  dmg:55, spd:22, range:600, spread:0,   count:1, pierce:true,  desc:'고속 관통 레이저',     col:'#ff2244' },
+  cannon:  { id:'cannon', name:'캐논',       emoji:'💣',  cd:120,  dmg:120,spd:7,  range:380, spread:0,   count:1, pierce:false, desc:'초고데미지 단발',       col:'#ff6600' },
+  twin:    { id:'twin',   name:'쌍권총',     emoji:'🔫',  cd:24,  dmg:18, spd:12, range:380, spread:0.08,count:2, pierce:false, desc:'2발 동시 발사',         col:'#ffaa00' },
 };
 
 // 무기 드랍 풀 (sword 제외 — 기본 무기)
@@ -909,7 +909,7 @@ function initMobileControls(){
           player.facing=Math.atan2(aimJoyState.dy,aimJoyState.dx);
         doAttack();
       }
-    },100);
+    },180);
     aimBase.classList.add('firing');
     const wp=WEAPONS&&WEAPONS[player&&player.weapon];
     if(aimStick) aimStick.textContent=wp?wp.emoji:'🔫';
@@ -1014,6 +1014,7 @@ const CHAR_LIST = [
   { id:'char_cap',         name:'캡모자',   desc:'모자 쓴 궁수',        color:'#aaf' },
   { id:'char_thumbsup',    name:'엄지척',   desc:'마법사 친구',         color:'#c7f' },
   { id:'char_tall',        name:'키다리',   desc:'안경 쓴 보스헌터',    color:'#ffd700' },
+  { id:'char_longcoat',    name:'롱코트',   desc:'제주도 쿨가이',       color:'#c8b89a' },
 ];
 
 // 커스텀 캐릭터 드로우 함수 맵
@@ -1023,6 +1024,7 @@ const CUSTOM_CHAR_DRAW = {
   char_cap:       (c,x,y,sz,f,t)=>drawCharArcherFriend(c,x,y,sz,f,t,false),
   char_thumbsup:  (c,x,y,sz,f,t)=>drawCharMageFriend(c,x,y,sz,f,t,false),
   char_tall:      (c,x,y,sz,f,t)=>drawCharTallHero(c,x,y,sz,f,t,false),
+  char_longcoat:  (c,x,y,sz,f,t)=>drawCharLongcoat(c,x,y,sz,f,t,false),
 };
 
 let selectedChar = 'player';
@@ -1035,14 +1037,14 @@ function buildCharSelectUI(){
   CHAR_LIST.forEach(ch=>{
     // 미리보기 캔버스
     const cv = document.createElement('canvas');
-    cv.width=60; cv.height=70;
+    cv.width=80; cv.height=95;
     const cc = cv.getContext('2d');
     cc.fillStyle='#0d0f20';
-    cc.fillRect(0,0,60,70);
+    cc.fillRect(0,0,80,95);
 
     // 캐릭터 그리기
     const drawFn = CUSTOM_CHAR_DRAW[ch.id]||CUSTOM_CHAR_DRAW.player;
-    try{ drawFn(cc,30,40,18,0,0); }catch(e){}
+    try{ drawFn(cc,40,52,22,0,0); }catch(e){}
 
     const card = document.createElement('div');
     card.className='char-card'+(ch.id===selectedChar?' selected':'');
@@ -3875,6 +3877,174 @@ function drawCachedChar(c, type, x, y, sz, facing, t, elite, enraged){
   c.drawImage(img, x - img.width/2|0, y - img.height/2|0);
 }
 
+
+// ── 캐릭터5: 롱코트 (베이지 롱코트+검정 터틀넥, 제주도 사진) ──
+function drawCharLongcoat(c,x,y,sz,facing,t,elite){
+  const fl=Math.cos(facing||0)<0?-1:1;
+  const bob=Math.sin(t*0.14)*1.5;
+  c.save(); c.translate(x,y+bob);
+
+  // ── 롱코트 (뒤까지 길게) ──────────────────────────
+  // 코트 뒷자락
+  c.beginPath();
+  c.moveTo(-sz*0.34,sz*0.3);
+  c.quadraticCurveTo(-sz*0.38,sz*0.55,-sz*0.32,sz*0.88);
+  c.lineTo(sz*0.32,sz*0.88);
+  c.quadraticCurveTo(sz*0.38,sz*0.55,sz*0.34,sz*0.3);
+  c.closePath();
+  c.fillStyle='#b5a898'; c.fill();
+
+  // 다리 (롱코트 안으로 살짝 보임)
+  [-1,1].forEach(s=>{
+    const ls=Math.sin(t*0.14)*sz*0.04*(s===1?1:-1);
+    c.beginPath(); c.roundRect(s*sz*0.08,sz*0.65+ls,sz*0.12,sz*0.28,3);
+    c.fillStyle='#1a1a1a'; c.fill(); // 검정 바지
+    // 흰 운동화
+    c.beginPath(); c.ellipse(s*sz*0.1+fl*sz*0.01,sz*0.94+ls,sz*0.1,sz*0.055,0,0,Math.PI*2);
+    c.fillStyle='#eee'; c.fill(); c.strokeStyle='#ccc'; c.lineWidth=1; c.stroke();
+  });
+
+  // 롱코트 몸통 (베이지/카키)
+  c.beginPath();
+  c.moveTo(-sz*0.34,sz*0.3);
+  c.lineTo(-sz*0.36,-sz*0.05);
+  c.quadraticCurveTo(-sz*0.3,-sz*0.18,-sz*0.18,-sz*0.16);
+  c.lineTo(sz*0.18,-sz*0.16);
+  c.quadraticCurveTo(sz*0.3,-sz*0.18,sz*0.36,-sz*0.05);
+  c.lineTo(sz*0.34,sz*0.3);
+  c.closePath();
+  c.fillStyle='#c8b89a'; c.fill();
+  c.strokeStyle='#a89878'; c.lineWidth=1.5; c.stroke();
+
+  // 코트 라펠 (깃)
+  c.beginPath();
+  c.moveTo(-sz*0.04,-sz*0.15);
+  c.lineTo(-sz*0.18,-sz*0.02);
+  c.lineTo(-sz*0.14,sz*0.12);
+  c.lineTo(-sz*0.04,-sz*0.02);
+  c.closePath();
+  c.fillStyle='#b8a888'; c.fill();
+  c.beginPath();
+  c.moveTo(sz*0.04,-sz*0.15);
+  c.lineTo(sz*0.18,-sz*0.02);
+  c.lineTo(sz*0.14,sz*0.12);
+  c.lineTo(sz*0.04,-sz*0.02);
+  c.closePath();
+  c.fillStyle='#b8a888'; c.fill();
+
+  // 코트 단추 3개
+  [sz*0.05,sz*0.18,sz*0.31].forEach(by=>{
+    c.beginPath(); c.arc(0,by,sz*0.028,0,Math.PI*2);
+    c.fillStyle='#888'; c.fill();
+    c.strokeStyle='#666'; c.lineWidth=0.8; c.stroke();
+  });
+
+  // 코트 안 검정 터틀넥
+  c.beginPath(); c.ellipse(0,-sz*0.02,sz*0.12,sz*0.16,0,0,Math.PI*2);
+  c.fillStyle='#111'; c.fill();
+  // 터틀넥 목 부분
+  c.beginPath(); c.rect(-sz*0.09,-sz*0.14,sz*0.18,sz*0.12);
+  c.fillStyle='#111'; c.fill();
+
+  // 팔 (코트 소매, 손은 뒤에)
+  [-1,1].forEach(s=>{
+    c.save(); c.translate(s*sz*0.32,sz*0.06);
+    c.rotate(s*0.12);
+    c.beginPath(); c.roundRect(-sz*0.07,-sz*0.02,sz*0.14,sz*0.42,4);
+    c.fillStyle='#c0aa8a'; c.fill(); c.strokeStyle='#a89878'; c.lineWidth=1; c.stroke();
+    // 소매 끝 (안쪽 검정)
+    c.beginPath(); c.rect(-sz*0.065,sz*0.35,sz*0.13,sz*0.08);
+    c.fillStyle='#111'; c.fill();
+    c.restore();
+  });
+
+  // ── 목 ─────────────────────────────────────────────
+  c.beginPath(); c.rect(-sz*0.09,-sz*0.16,sz*0.18,sz*0.06);
+  c.fillStyle='#e0c0a0'; c.fill();
+
+  // ── 얼굴 (둥글고 볼살 있음) ───────────────────────
+  // 볼살
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.ellipse(s*sz*0.2,-sz*0.25,sz*0.1,sz*0.08,0,0,Math.PI*2);
+    c.fillStyle='#e8c8a899'; c.fill();
+  });
+  // 얼굴 본체
+  c.beginPath(); c.ellipse(0,-sz*0.28,sz*0.24,sz*0.25,0,0,Math.PI*2);
+  c.fillStyle='#f0d0b0'; c.fill();
+  c.strokeStyle='#d0a880'; c.lineWidth=1; c.stroke();
+
+  // 눈썹 (짧고 자연스럽게)
+  [-1,1].forEach(s=>{
+    c.beginPath();
+    c.moveTo(s*sz*0.06,-sz*0.34);
+    c.quadraticCurveTo(s*sz*0.12,-sz*0.37,s*sz*0.18,-sz*0.33);
+    c.strokeStyle='#2a1a0a'; c.lineWidth=sz*0.032; c.lineCap='round'; c.stroke();
+  });
+
+  // 눈 (쌍꺼풀 있는 편, 크게 표현)
+  [-1,1].forEach(s=>{
+    // 눈 흰자
+    c.beginPath(); c.ellipse(s*sz*0.11,-sz*0.27,sz*0.065,sz*0.048,0,0,Math.PI*2);
+    c.fillStyle='#fff'; c.fill(); c.strokeStyle='#ccc'; c.lineWidth=0.5; c.stroke();
+    // 홍채
+    c.beginPath(); c.ellipse(s*sz*0.11,-sz*0.27,sz*0.038,sz*0.038,0,0,Math.PI*2);
+    c.fillStyle='#2a1a0a'; c.fill();
+    // 눈동자 하이라이트
+    c.beginPath(); c.arc(s*sz*0.11+sz*0.014,-sz*0.275,sz*0.014,0,Math.PI*2);
+    c.fillStyle='#fff'; c.fill();
+    // 눈꺼풀 선 (쌍꺼풀)
+    c.beginPath();
+    c.moveTo(s*(sz*0.06),-sz*0.305);
+    c.quadraticCurveTo(s*sz*0.11,-sz*0.32,s*(sz*0.16),-sz*0.305);
+    c.strokeStyle='#1a1208cc'; c.lineWidth=sz*0.022; c.stroke();
+  });
+
+  // 코 (낮고 퍼진 편)
+  c.beginPath(); c.arc(0,-sz*0.19,sz*0.035,0,Math.PI*2);
+  c.fillStyle='#d0a070'; c.fill();
+  // 콧망울
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.ellipse(s*sz*0.04,-sz*0.18,sz*0.025,sz*0.018,0,0,Math.PI*2);
+    c.fillStyle='#c09060'; c.fill();
+  });
+
+  // 입 (조금 벌린 듯, 쿨한 표정)
+  c.beginPath();
+  c.moveTo(-sz*0.08,-sz*0.11);
+  c.quadraticCurveTo(0,-sz*0.09,sz*0.08,-sz*0.11);
+  c.strokeStyle='#a07050'; c.lineWidth=sz*0.026; c.lineCap='round'; c.stroke();
+  // 아랫입술
+  c.beginPath(); c.ellipse(0,-sz*0.085,sz*0.055,sz*0.02,0,0,Math.PI);
+  c.strokeStyle='#b08060'; c.lineWidth=sz*0.018; c.stroke();
+
+  // 머리카락 (짧은 검정, 앞머리 자연스럽게 내려옴)
+  c.beginPath(); c.ellipse(0,-sz*0.38,sz*0.24,sz*0.16,0,0,Math.PI*2);
+  c.fillStyle='#0d0d10'; c.fill();
+  // 앞머리 (약간 내려온 스타일)
+  c.beginPath();
+  c.moveTo(-sz*0.2,-sz*0.36);
+  c.quadraticCurveTo(-sz*0.22,-sz*0.48,0,-sz*0.5);
+  c.quadraticCurveTo(sz*0.22,-sz*0.48,sz*0.2,-sz*0.36);
+  c.closePath(); c.fillStyle='#0d0d10'; c.fill();
+  // 앞머리 한 올
+  c.beginPath();
+  c.moveTo(fl*sz*0.04,-sz*0.38);
+  c.quadraticCurveTo(fl*sz*0.08,-sz*0.46,fl*sz*0.02,-sz*0.36);
+  c.strokeStyle='#1a1a20'; c.lineWidth=sz*0.04; c.lineCap='round'; c.stroke();
+  // 귀
+  [-1,1].forEach(s=>{
+    c.beginPath(); c.ellipse(s*sz*0.24,-sz*0.27,sz*0.045,sz*0.065,0,0,Math.PI*2);
+    c.fillStyle='#e8c8a0'; c.fill(); c.strokeStyle='#d0a880'; c.lineWidth=0.8; c.stroke();
+  });
+
+  if(elite){
+    c.save();
+    c.strokeStyle='#ffd700'; c.lineWidth=2.5;
+    c.beginPath(); c.arc(0,-sz*0.28,sz*0.36,0,Math.PI*2); c.stroke();
+    c.restore();
+  }
+  c.restore();
+}
 // ── 캐릭터 타입 → 드로우 함수 매핑 ──────────────────
 const CHAR_DRAW = {
   // ── 커스텀 4인방 캐릭터 ──
@@ -3892,7 +4062,7 @@ const CHAR_DRAW = {
   bomber:    drawCharHunter,   // 헌터 베이스
   vampire:   (c,x,y,sz,f,t,e)=>drawCharMageFriend(c,x,y,sz,f,t,e),
   golem:     drawCharGolem,
-  wraith:    (c,x,y,sz,f,t,e)=>drawCharTallHero(c,x,y,sz,f,t,e),
+  wraith:    (c,x,y,sz,f,t,e)=>drawCharLongcoat(c,x,y,sz,f,t,e||false),
   hydra:     drawCharDragon,   // 드래곤 베이스
   lich:      drawCharLich,
   dragon:    drawCharDragon,
