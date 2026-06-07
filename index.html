@@ -3945,7 +3945,7 @@ const _origDraw=draw;
 // update/draw 를 멀티 모드일 때 서버 상태로 대체
 const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 function multiDraw(){
-  if(!multiState) return;
+  if(!multiState||!multiState.players) return;
   const W=canvas.width, H=canvas.height;
   // 내 위치로 카메라
   const me=multiState.players.find(p=>p.id===myMultiId);
@@ -4004,9 +4004,9 @@ function multiDraw(){
 
   // 위험범위 렌더 (싱글과 동일 로직 — monsters 임시 교체)
   const _savedMonsters=monsters;
-  monsters=multiState.monsters||[];
-  const _savedPx=px,_savedPy=py;
-  if(me){window._mpx=me.x;window._mpy=me.y;}
+  const multiMonsterArr=Array.isArray(multiState.monsters)?multiState.monsters:[];
+  monsters=multiMonsterArr;
+  const _savedPx=me?me.x:0, _savedPy=me?me.y:0;
   // drawDangerZones 인라인
   monsters.forEach(m=>{
     if(!m.alive||!m.warnPhase) return;
