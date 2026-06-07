@@ -340,6 +340,7 @@ function gameTick(room){
     bullets:room.bullets.map(b=>({x:b.x,y:b.y,angle:b.angle,isMob:b.isMob,col:b.col||'#f44'})),
     items:(room.items||[]).map(it=>({id:it.id,x:it.x,y:it.y,type:it.type,pulse:it.pulse||0})),
     stage:room.stage,kills:room.kills,totalKills:room.totalKills,tick:room.tick,
+    bossSpawned:room.bossSpawned,
   });
 }
 
