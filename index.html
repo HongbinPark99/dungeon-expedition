@@ -353,7 +353,7 @@ canvas{display:block;cursor:none;}
   <div class="lobby-sub">어둠의 던전을 탐험하라</div>
   <div class="key-box">
     <b>↑↓←→ / WASD</b> 이동<br>
-    <b>🖱 마우스</b> 조준 &nbsp;|&nbsp; <b>좌클릭 / SPACE</b> 발사<br>
+    <b>🖱 마우스</b> 조준 &nbsp;|&nbsp; <b>좌클릭</b> 공격 &nbsp;|&nbsp; <b>SPACE</b> 구르기<br>
     <b>우클릭 / 1</b> 폭탄 &nbsp;|&nbsp; <b>2</b> 방패막 &nbsp;|&nbsp; <b>3</b> 번개<br>
     안개 속 보스 방을 탐험해 찾아라!
   </div>
@@ -453,7 +453,7 @@ canvas{display:block;cursor:none;}
       누적: <span id="s-total">0</span>
     </div>
   </div>
-  <div id="hint">↑↓←→ 이동 | 마우스 조준<br>좌클릭/SPACE 공격 | 우클릭/1 폭탄<br>2 방패 | 3 번개 | 무기 드랍 주워서 교체!</div>
+  <div id="hint">↑↓←→ 이동 | 마우스 조준 | 좌클릭 공격<br>SPACE 구르기(무적) | 우클릭/1 폭탄<br>2 방패 | 3 번개 | 무기 드랍 주워서 교체!</div>
   <div id="weapon-hud" style="position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:#0a0c1acc;border:1px solid #2a2d50;border-radius:8px;padding:6px 18px;font-size:.78rem;color:#ccd;z-index:10;backdrop-filter:blur(6px);text-align:center;pointer-events:none;"><span id="weapon-emoji">🗡</span> <span id="weapon-name">기본 검</span> <span style="color:#667;font-size:.65rem;margin-left:8px" id="weapon-desc">기본 근접 공격</span></div>
 
   <div id="skill-bar">
@@ -805,7 +805,8 @@ const SFX={
   warning:function(){_tone(920,'sine',0.04,0.07);},
   door:function(){[220,330,440].forEach(function(f,i){_tone(f,'sine',0.18,0.18,0,i*0.09);});},
   step:function(){_noise(0.035,0.03,500);},
-  click:function(){_tone(440,'sine',0.05,0.09);}
+  click:function(){_tone(440,'sine',0.05,0.09);},
+   dash:function(){_noise(0.07,0.05,800);_tone(330,'sine',0.06,0.06,0,0.03);}
 };
 function startBGM(){
   if(_sfxMuted)return;
@@ -813,18 +814,45 @@ function startBGM(){
   try{
     const ac=_getACtx();
     _bgmGain=ac.createGain();_bgmGain.gain.value=0.018;_bgmGain.connect(ac.destination);
-    [55,110].forEach(function(freq){
+
+    // 저음 드론 베이스
+    [55,82.4].forEach(function(freq){
       const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.28;
+      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.18;
       o.connect(g);g.connect(_bgmGain);o.start();_bgmOscs.push(o);
     });
+
+    // 멜로디 패턴 (던전 분위기)
+    const melody=[220,247,262,220, 196,220,165,196, 220,247,294,262, 247,220,196,165];
+    const bass  =[55,55,55,55,    44,44,44,44,     55,55,55,55,    44,44,44,44];
     let beat=0;
+    const BPM=108, SPB=60000/BPM;
     const rid=setInterval(function(){
       if(_sfxMuted||!_bgmGain){clearInterval(rid);return;}
-      if(beat%4===0)_noise(0.035,0.018,2400);
-      if(beat%8===0)_tone(110,'sine',0.08,0.012);
+      const b=beat%melody.length;
+      // 멜로디
+      if(beat%2===0){
+        const o=ac.createOscillator(),g=ac.createGain();
+        o.type='triangle';o.frequency.value=melody[b];
+        const t=ac.currentTime;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.22,t+0.04);
+        g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*1.8);
+        o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*2);
+      }
+      // 킥
+      if(beat%4===0){_noise(0.08,0.014,60);}
+      // 하이햇
+      if(beat%2===0){_noise(0.03,0.008,3500);}
+      // 베이스 펄스
+      if(beat%4===0){
+        const o=ac.createOscillator(),g=ac.createGain();
+        o.type='sine';o.frequency.value=bass[b];
+        const t=ac.currentTime;
+        g.gain.setValueAtTime(0.3,t);g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*3.5);
+        o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*4);
+      }
       beat++;
-    },260);
+    },SPB/2);
     _bgmOscs.push({stop:function(){clearInterval(rid);}});
   }catch(e){}
 }
@@ -1305,7 +1333,7 @@ canvas.addEventListener('contextmenu',e=>{ e.preventDefault(); doSkillBomb(); })
 
 document.addEventListener('keydown',e=>{
   keys[e.key]=true;
-  if(e.key===' '){e.preventDefault(); doAttack();}
+  if(e.key===' '){e.preventDefault(); doDash();}
   if(e.key==='1'){e.preventDefault(); doSkillBomb();}
   if(e.key==='2'){e.preventDefault(); doSkillShield();}
   if(e.key==='3'){e.preventDefault(); doSkillThunder();}
@@ -1347,6 +1375,7 @@ function initGame(keepStage=false){
     x: sr.cx * TILE, y: sr.cy * TILE,
     hp: P_HP, maxHp: P_HP,
     alive: true, iframes: 0, attackCd: 0,
+    dashCd: 0, dashVx: 0, dashVy: 0, dashFrames: 0,
     facing: 0,
     weapon: 'sword',   // 현재 무기
     weaponAmmo: {},    // 무기별 남은 탄약 (무한=null)
@@ -1550,6 +1579,39 @@ function spawnBoss(){
 // ═══════════════════════════════════════════════════════
 //  공격
 // ═══════════════════════════════════════════════════════
+// ── 구르기(대시) ──────────────────────────────────
+const DASH_SPEED = 9.5;   // 대시 속도
+const DASH_FRAMES = 12;   // 대시 지속 프레임
+const DASH_CD = 60;       // 대시 쿨다운 (1초)
+const DASH_IFRAMES = 14;  // 무적 프레임
+
+function doDash(){
+  if(multiMode){
+    const now=Date.now();
+    if(!window._multiLastDash) window._multiLastDash=0;
+    if(now-window._multiLastDash < 1000) return;
+    window._multiLastDash=now;
+    if(multiWs&&multiWs.readyState===1)
+      multiWs.send(JSON.stringify({type:'dash'}));
+    SFX.dash();
+    return;
+  }
+  if(!gameRunning||!player.alive) return;
+  if(player.dashCd>0) return;
+  // 이동 방향 또는 facing 방향으로 대시
+  const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
+  const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
+  let ang;
+  if(dx||dy) ang=Math.atan2(dy,dx);
+  else ang=player.facing||0;
+  player.dashVx=Math.cos(ang)*DASH_SPEED;
+  player.dashVy=Math.sin(ang)*DASH_SPEED;
+  player.dashFrames=DASH_FRAMES;
+  player.dashCd=DASH_CD;
+  player.iframes=DASH_IFRAMES;
+  SFX.dash();
+}
+
 function doAttack(){
   if(multiMode){
     const now=Date.now();
@@ -1748,9 +1810,14 @@ function update(){
     if(mobileActive && typeof aimJoyState!=='undefined' && aimJoyState.active){
       player.facing = Math.atan2(aimJoyState.dy, aimJoyState.dx);
     }
-    if(dx||dy){
+    // 대시 처리
+    if(player.dashFrames>0){
+      const dr=moveSlide(player.x,player.y,player.x+player.dashVx,player.y+player.dashVy);
+      player.x=Math.max(TILE,Math.min(MAP_W-TILE,dr.x));
+      player.y=Math.max(TILE,Math.min(MAP_H-TILE,dr.y));
+      player.dashFrames--;
+    } else if(dx||dy){
       const len=Math.hypot(dx,dy);
-      // facing은 마우스가 움직였을 때 이미 업데이트됨 — 이동방향으론 덮지 않음
       if(tick%18===0) SFX.step();
       const spd2 = P_SPEED*(player.speedBoost>0?1.7:1);
       const nx=player.x+(dx/len)*spd2;
@@ -1759,6 +1826,8 @@ function update(){
       player.x=Math.max(TILE,Math.min(MAP_W-TILE,r.x));
       player.y=Math.max(TILE,Math.min(MAP_H-TILE,r.y));
     }
+    // 대시 쿨다운
+    if(player.dashCd>0) player.dashCd--;
 
     // 보스 방 진입
     if(!bossSpawned){
@@ -2628,10 +2697,14 @@ function draw(){
       ctx.shadowBlur=0;
     }
 
-    // 속도부스트 잔상
-    if(player.speedBoost>0){
-      ctx.globalAlpha=0.25;
-      drawPlayerSprite(ctx, sx-4, sy+2, player.facing, false, player.alive);
+    // 대시/속도부스트 잔상
+    if(player.dashFrames>0||player.speedBoost>0){
+      ctx.globalAlpha=0.3;
+      const trailDx=player.dashFrames>0?-player.dashVx*0.5:0;
+      const trailDy=player.dashFrames>0?-player.dashVy*0.5:0;
+      drawPlayerSprite(ctx, sx+trailDx, sy+trailDy, player.facing, false, player.alive);
+      ctx.globalAlpha=0.15;
+      drawPlayerSprite(ctx, sx+trailDx*2, sy+trailDy*2, player.facing, false, player.alive);
       ctx.globalAlpha=1;
     }
 
@@ -3937,6 +4010,7 @@ function connectMultiWs(url, joinMsg){
       window._multiCamInit = false;
       window._multiLastAttack=0; window._multiLastBomb=0;
       window._multiLastShield=0; window._multiLastThunder=0;
+      window._multiLastDash=0;
       window._charIdMap[msg.pid] = msg.charId || selectedChar || 'photo0';
 
       // 맵 데이터 미리 저장
@@ -3962,6 +4036,7 @@ function connectMultiWs(url, joinMsg){
       window._multiCamInit = false;
       window._multiLastAttack=0; window._multiLastBomb=0;
       window._multiLastShield=0; window._multiLastThunder=0;
+      window._multiLastDash=0;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       renderWaitingPlayers(msg.players, msg.hostId);
       renderWaitingHostArea(msg.hostId===myMultiId);
@@ -3997,6 +4072,7 @@ function connectMultiWs(url, joinMsg){
       window._multiCamInit = false;
       window._multiLastAttack=0; window._multiLastBomb=0;
       window._multiLastShield=0; window._multiLastThunder=0;
+      window._multiLastDash=0;
       // BGM 시작 (싱글과 동일)
       startBGM(); setBGMStage(1);
       if(_bgmGain) _bgmGain.gain.value=0.008; // 멀티 BGM 낮게
@@ -4017,6 +4093,7 @@ function connectMultiWs(url, joinMsg){
       window._multiCamInit = false;
       window._multiLastAttack=0; window._multiLastBomb=0;
       window._multiLastShield=0; window._multiLastThunder=0;
+      window._multiLastDash=0;
       if(msg.players) msg.players.forEach(p=>{ if(p.charId) window._charIdMap[p.id]=p.charId; });
       // 첫 state 수신 시 카메라 즉시 점프
       if(!window._multiCamInit){
