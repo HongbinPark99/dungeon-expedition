@@ -424,6 +424,12 @@ wss.on('connection',ws=>{
     if(msg.type==='bomb'&&player.alive){
       for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
     }
+    if(msg.type==='dash'&&player.alive){
+      // 서버에서 대시: iframes 부여
+      player.iframes=14;
+      broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
+      return;
+    }
     if(msg.type==='pickup'&&player.alive){
       const it=room.items&&room.items.find(i=>i.id===msg.itemId);
       if(it&&Math.hypot(it.x-player.x,it.y-player.y)<50){
