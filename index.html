@@ -3,9 +3,6 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<!-- v1780916921 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>던전 원정대</title>
 <style>
@@ -22,12 +19,8 @@ body{
 #lobby{
   position:fixed;inset:0;
   background:radial-gradient(ellipse at 50% 60%, #0d1230 0%, #050810 70%);
-  display:flex;flex-direction:column;align-items:center;
-  justify-content:flex-start;
-  gap:16px;z-index:200;
-  overflow-y:auto;
-  padding:30px 16px 40px;
-  box-sizing:border-box;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;z-index:200;
 }
 #lobby h1{
   font-family:'Black Han Sans',sans-serif;font-size:3rem;
@@ -558,40 +551,17 @@ canvas{display:block;cursor:none;}
 
 <script>
 'use strict';
-// ── 전역 변수 최상단 선언 (hoisting 보장) ──────────
-var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
-var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
-var _exploredVersion=0, _lastExploredVersion=-1;
-var rafId=null, lastT=0, accumT=0;
-var mouseAttacking=false, nextId=1;
-var _audioCtx=null, _sfxMuted=false, _bgmGain=null, _bgmOscs=[];
-var isMobile=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
-var mobileActive=false, aimFireInterval=null;
-var selectedChar='photo0';
-var multiMode=false, multiWs=null, multiState=null;
-var myMultiId=null, myColorIdx=0, currentServerUrl='';
-var gameRunning=false, gameWon=false, gameOver=false;
-var player=null, monsters=[], particles=[], attackFx=[];
-var camX=0, camY=0, kills=0, tick=0, gold=0;
-var bullets=[], bombs=[], dangerZonesFx=[], items=[];
-var skillCd={bomb:0,shield:0,thunder:0}, shieldActive=0;
-var bossArena=null, bossSpawned=false, bossDefeated=false;
-var screenShake=0, spawnTimer=0, logEntries=[];
-var _shopNextStage=1, alertTimer=0;
-var _pickedItemIds=new Set();
-// ────────────────────────────────────────────────────
-// _pickedItemIds (dup removed)
 // ═══════════════════════════════════════════════════════
 //  상수
 // ═══════════════════════════════════════════════════════
 // 스테이지별 맵 크기 (스테이지 올라갈수록 넓어짐)
 const BASE_MAP_W = 4000, BASE_MAP_H = 3200;
-var MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
-var COLS = MAP_W / 48 | 0;
-var ROWS = MAP_H / 48 | 0;
+let MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
+let COLS = MAP_W / 48 | 0;
+let ROWS = MAP_H / 48 | 0;
 const TILE = 48;
-var stage = 1;
-var totalKills = 0; // 전체 누적 킬
+let stage = 1;
+let totalKills = 0; // 전체 누적 킬
 const SIGHT_R = 480;
 const P_SPEED = 2.0;
 const P_HP    = 120;
@@ -640,8 +610,8 @@ resizeCanvas();
 // ═══════════════════════════════════════════════════════
 //  맵 생성
 // ═══════════════════════════════════════════════════════
-var tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
-var explored;// Uint8Array COLS*ROWS  0/1
+let tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
+let explored;// Uint8Array COLS*ROWS  0/1
 
 function tileAt(c,r){
   if(c<0||c>=COLS||r<0||r>=ROWS) return 1;
@@ -810,23 +780,23 @@ function moveSlide(ox,oy,nx,ny,r=13){
 // ═══════════════════════════════════════════════════════
 //  게임 상태
 // ═══════════════════════════════════════════════════════
-var player, monsters, particles, attackFx;
-var camX=0, camY=0;
-var kills=0, tick=0, gold=0;
-var bullets=[], bombs=[], dangerZonesFx=[], items=[];
-var skillCd={bomb:0, shield:0, thunder:0};
-var shieldActive=0; // 방패 지속 프레임
-var bossArena, bossSpawned=false, bossDefeated=false;
-var gameRunning=false, gameWon=false, gameOver=false;
-var screenShake=0;
-var spawnTimer=0;
-var logEntries=[];
+let player, monsters, particles, attackFx;
+let camX=0, camY=0;
+let kills=0, tick=0, gold=0;
+let bullets=[], bombs=[], dangerZonesFx=[], items=[];
+let skillCd={bomb:0, shield:0, thunder:0};
+let shieldActive=0; // 방패 지속 프레임
+let bossArena, bossSpawned=false, bossDefeated=false;
+let gameRunning=false, gameWon=false, gameOver=false;
+let screenShake=0;
+let spawnTimer=0;
+let logEntries=[];
 
 
 // ═══════════════════════════════════════════════════════
 //  효과음 시스템 — Web Audio API 합성음
 // ═══════════════════════════════════════════════════════
-var _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
+let _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
 function _getACtx(){
   if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   if(_audioCtx.state==='suspended')_audioCtx.resume();
@@ -962,8 +932,8 @@ function addMuteButton(){
 // ═══════════════════════════════════════════════════════
 //  모바일 컨트롤
 // ═══════════════════════════════════════════════════════
-var isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-var mobileActive = false;
+let isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+let mobileActive = false;
 
 // 조이스틱 상태
 const joyState = { dx:0, dy:0, active:false, id:-1 };
@@ -1028,7 +998,7 @@ function initMobileControls(){
   const aimStick   = document.getElementById('aim-joystick-stick');
   const AIM_BASE_R  = 72; // 더 큰 반지름
   const aimJoyState = {dx:0, dy:0, active:false, id:-1};
-  var   aimFireInterval = null;
+  let   aimFireInterval = null;
 
   function aimJoyMove(cx, cy, ox, oy){
     let dx=cx-ox, dy=cy-oy;
@@ -1185,7 +1155,7 @@ const CUSTOM_CHAR_DRAW = {
   photo4: (c,x,y,sz,f,t)=>drawPhotoChar(c,'photo4',x,y,sz,'#cc88ff',t),
 };
 
-var selectedChar = 'photo0';
+let selectedChar = 'photo0';
 
 function buildCharSelectUI(){
   const container = document.getElementById('char-cards');
@@ -1390,7 +1360,7 @@ function drawPhotoMonster(c, photoKey, cx, cy, sz, bodyColor, enraged, warnPhase
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
 const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
-var mouseAttacking=false; // 마우스 버튼 홀드 시 연사
+let mouseAttacking=false; // 마우스 버튼 홀드 시 연사
 
 canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
@@ -1555,7 +1525,7 @@ const MEMOJI={
   boss:'👑', boss2:'🌑', boss3:'❄️', boss4:'⚡', boss5:'💀',
 };
 
-var nextId=1;
+let nextId=1;
 
 // ── 스테이지별 몬스터 풀 계산 ─────────────────────────
 function getMonsterPool(stg){
@@ -1690,11 +1660,11 @@ function doDash(){
     // 클라이언트 즉시 예측 (싱글과 동일 물리)
     if(player&&player.alive){
       const ang=player.facing||0;
-      player.dashVx=Math.cos(ang)*DASH_SPEED;
-      player.dashVy=Math.sin(ang)*DASH_SPEED;
-      player.dashFrames=DASH_FRAMES;
-      player.dashCd=DASH_CD;
-      player.iframes=DASH_IFRAMES;
+      player.dashVx=Math.cos(ang)*8;
+      player.dashVy=Math.sin(ang)*8;
+      player.dashFrames=12;
+      player.dashCd=180;
+      player.iframes=20;
     }
     try{SFX.dash();}catch(e){}
     return;
@@ -1753,20 +1723,15 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
-    if(!player||!player.alive) return;
-    if(skillCd.bomb>0) return;
-    skillCd.bomb=CD_BOMB;      // 즉시 쿨다운 적용
-    if(multiWs&&multiWs.readyState===1)
+    if(!gameRunning&&!multiState) return;
+    const now=Date.now();
+    if(!window._multiLastBomb) window._multiLastBomb=0;
+    if(now-window._multiLastBomb < 6000) return;
+    window._multiLastBomb=now;
+    if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'bomb'}));
-    // 클라이언트 즉시 폭탄 생성 (시각 피드백)
-    if(player&&player.alive){
-      const angle=player.facing||0;
-      bombs.push({x:player.x,y:player.y,
-        vx:Math.cos(angle)*5,vy:Math.sin(angle)*5,
-        dist:0,maxDist:200,exploded:false,explodeTimer:0,
-        radius:0,maxRadius:90,alive:true});
+      try{SFX.explode();}catch(e){}
     }
-    try{SFX.explode();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.bomb>0) return;
@@ -1784,13 +1749,14 @@ function doSkillBomb(){
 
 function doSkillShield(){
   if(multiMode){
-    if(!player||!player.alive) return;
-    if(skillCd.shield>0) return;
-    skillCd.shield=CD_SHIELD;
-    shieldActive=120;
-    if(multiWs&&multiWs.readyState===1)
+    const now=Date.now();
+    if(!window._multiLastShield) window._multiLastShield=0;
+    if(now-window._multiLastShield < 8000) return; // CD_SHIELD=480프레임=8초
+    window._multiLastShield=now;
+    if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'shield'}));
-    try{SFX.shield();}catch(e){}
+      SFX.shield();
+    }
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.shield>0) return;
@@ -1802,17 +1768,14 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
-    if(!player||!player.alive) return;
-    if(skillCd.thunder>0) return;
-    skillCd.thunder=CD_THUNDER;
-    if(multiWs&&multiWs.readyState===1)
+    const now=Date.now();
+    if(!window._multiLastThunder) window._multiLastThunder=0;
+    if(now-window._multiLastThunder < 5000) return; // CD_THUNDER=300프레임=5초
+    window._multiLastThunder=now;
+    if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'thunder'}));
-    // 클라이언트 즉시 이펙트
-    if(player&&player.alive){
-      spawnParticles(player.x,player.y,'#aaff00',12);
-      dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#ccff44',type:'thunder'});
+      SFX.thunder&&SFX.thunder();
     }
-    try{SFX.thunder&&SFX.thunder();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.thunder>0) return;
@@ -1895,8 +1858,7 @@ function spawnParticles(x,y,col,n=6){
 //  업데이트
 // ═══════════════════════════════════════════════════════
 function update(){
-  // 멀티모드도 update() 실행 (서버 처리 부분만 스킵)
-  if(!gameRunning && !multiMode) return;
+  if(!gameRunning) return;
   tick++;
 
   // ── 플레이어 이동 ─────────────────────────────────
@@ -1959,8 +1921,8 @@ function update(){
     }
   }
 
-  // ── 몬스터 AI (서버 처리 → 멀티에서 스킵) ───────
-  if(!multiMode) monsters.forEach(m=>{
+  // ── 몬스터 AI ────────────────────────────────────
+  monsters.forEach(m=>{
     if(!m.alive) return;
     m.phase++;
     const dx=player.x-m.x, dy=player.y-m.y;
@@ -1974,12 +1936,6 @@ function update(){
       const nx=m.x+(dx/d)*spd, ny=m.y+(dy/d)*spd;
       const r=moveSlide(m.x,m.y,nx,ny,m.size*0.7);
       m.x=r.x; m.y=r.y;
-    }
-    // 보스는 bossArena 안에서만 이동
-    if(m.type&&m.type.startsWith('boss')&&bossArena){
-      const pad=m.size;
-      m.x=Math.max(bossArena.x+pad, Math.min(bossArena.x+bossArena.w-pad, m.x));
-      m.y=Math.max(bossArena.y+pad, Math.min(bossArena.y+bossArena.h-pad, m.y));
     }
 
     m.attackCd--;
@@ -2081,8 +2037,8 @@ function update(){
     }
   });
 
-  // ── 몬스터 리스폰 (절대 상한 30, 멀티에서 스킵) ──
-  if(!multiMode){ spawnTimer++;
+  // ── 몬스터 리스폰 (절대 상한 30) ─────────────────
+  spawnTimer++;
   if(spawnTimer>Math.max(150,280-(stage-1)*15)){
     spawnTimer=0;
     const normal=monsters.filter(m=>m.alive&&m.type!=='boss').length;
@@ -2105,12 +2061,6 @@ function update(){
     if(!player.alive) return;
     if(Math.hypot(it.x-player.x,it.y-player.y)<22){
       it.life=0;
-      if(multiMode && it.id){
-        _pickedItemIds.add(it.id);
-        // 서버에 픽업 알림 (서버가 items에서 제거)
-        if(multiWs&&multiWs.readyState===1)
-          multiWs.send(JSON.stringify({type:'pickup',itemId:it.id}));
-      }
       SFX.item();
       if(it.type==='hp'){
         player.hp=Math.min(player.maxHp,player.hp+30);
@@ -2317,7 +2267,9 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
-// (above vars declared at top)
+let _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
+let _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
+let _exploredVersion=0, _lastExploredVersion=-1;
 
 function _rebuildTileCache(){
   if(!_tileCanvas||_tileCanvas.width!==MAP_W||_tileCanvas.height!==MAP_H){
@@ -4021,7 +3973,7 @@ function addLog(msg,type=''){
   el.innerHTML=logEntries.slice(0,7).map(e=>`<div class="le${e.type?' '+e.type:''}">${e.msg}</div>`).join('');
 }
 
-var alertTimer=0;
+let alertTimer=0;
 function showAlert(msg){
   const el=document.getElementById('alert');
   document.getElementById('alert-msg').textContent=msg;
@@ -4098,8 +4050,8 @@ function showEnding(won){
 // ═══════════════════════════════════════════════════════
 //  메인 루프
 // ═══════════════════════════════════════════════════════
-var rafId=null;
-var lastT=0, accumT=0;
+let rafId=null;
+let lastT=0, accumT=0;
 const FIXED_DT=1000/60; // 고정 60fps 업데이트
 
 // ── 멀티 클라이언트 업데이트 (카메라·dash·fog) ────────
@@ -4107,7 +4059,7 @@ function updateMultiClient(){
   tick++;
   if(!player) return;
 
-  // ── 마우스 facing ─────────────────────────────────
+  // 마우스 facing
   if(player.alive){
     player.facing=Math.atan2(
       (mouse.y+camY)-player.y,
@@ -4115,92 +4067,22 @@ function updateMultiClient(){
     );
   }
 
-  // ── 클라이언트 예측 이동 ───────────────────────────
-  if(player.alive){
-    const inp=buildInput();
-    let dx=0,dy=0;
-    if(inp.up)    dy-=1;
-    if(inp.down)  dy+=1;
-    if(inp.left)  dx-=1;
-    if(inp.right) dx+=1;
-    if(dx&&dy){dx*=0.707;dy*=0.707;}
-    const spd=P_SPEED*(player.speedBoost>0?1.7:1);
-    if(dx||dy){
-      const nx=player.x+dx*spd, ny=player.y+dy*spd;
-      if(!isWall(nx,player.y)) player.x=nx;
-      if(!isWall(player.x,ny)) player.y=ny;
-      player.x=Math.max(TILE,Math.min(MAP_W-TILE,player.x));
-      player.y=Math.max(TILE,Math.min(MAP_H-TILE,player.y));
-    }
-  }
-
-  // ── 구르기 물리 ────────────────────────────────────
+  // 구르기 물리 (클라이언트 측 예측)
   if(player.dashFrames>0){
     const nx=player.x+player.dashVx;
     const ny=player.y+player.dashVy;
     if(!isWall(nx,player.y)) player.x=nx;
     if(!isWall(player.x,ny)) player.y=ny;
     player.dashFrames--;
-    player.dashVx*=0.88;
-    player.dashVy*=0.88;
+    player.dashVx*=0.85;
+    player.dashVy*=0.85;
   }
-  } // end if(!multiMode) respawn
+  if(player.dashCd>0) player.dashCd--;
+  if(player.iframes>0) player.iframes--;
+  if(player.attackCd>0) player.attackCd--;
+  if(screenShake>0) screenShake--;
 
-  // ── 쿨다운 감소 (싱글과 동일) ─────────────────────
-  if(player.dashCd>0)     player.dashCd--;
-  if(player.iframes>0)    player.iframes--;
-  if(player.attackCd>0)   player.attackCd--;
-  if(player.speedBoost>0) player.speedBoost--;
-  if(skillCd.bomb>0)      skillCd.bomb--;
-  if(skillCd.shield>0)    skillCd.shield--;
-  if(skillCd.thunder>0)   skillCd.thunder--;
-  if(shieldActive>0)      shieldActive--;
-  if(screenShake>0)       screenShake--;
-
-  // ── 아이템 픽업 (싱글과 동일 로직) ───────────────
-  if(player.alive){
-    items.forEach(it=>{
-      it.life--; it.pulse++;
-      if(it.life<=0) return;
-      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
-        it.life=0;
-        if(it.id) _pickedItemIds.add(it.id); // 픽업 ID 기록
-        try{SFX.item();}catch(e){}
-        if(it.type==='hp'){
-          player.hp=Math.min(player.maxHp,player.hp+30);
-          addLog('❤️ HP +30','win');
-        } else if(it.type==='bomb_charge'){
-          skillCd.bomb=0; addLog('💣 폭탄 충전!','win');
-        } else if(it.type==='shield_charge'){
-          skillCd.shield=0; addLog('🛡 방패 충전!','win');
-        } else if(it.type==='thunder_charge'){
-          skillCd.thunder=0; addLog('⚡ 번개 충전!','win');
-        } else if(it.type==='speed'){
-          player.speedBoost=(player.speedBoost||0)+180;
-          addLog('👟 속도 부스트!','win');
-        } else if(it.type&&it.type.startsWith('weapon_')){
-          const wid=it.type.slice(7);
-          const wp2=WEAPONS&&WEAPONS[wid];
-          if(wp2){ player.weapon=wid; addLog(`${wp2.emoji} ${wp2.name} 획득!`,'win'); }
-        }
-      }
-    });
-    items=items.filter(it=>it.life>0 && !_pickedItemIds.has(it.id));
-  }
-
-  // ── 파티클 ────────────────────────────────────────
-  let pi=0;
-  for(let i=0;i<particles.length;i++){
-    const p=particles[i];
-    p.x+=p.vx;p.y+=p.vy;p.vx*=0.88;p.vy*=0.88;p.life--;
-    if(p.life>0) particles[pi++]=p;
-  }
-  particles.length=pi;
-
-  // ── fog 업데이트 ──────────────────────────────────
-  if(tick%4===0) updateFog();
-
-  // ── 카메라 추적 ───────────────────────────────────
+  // 카메라 추적 (멀티도 동일하게)
   if(player){
     const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
     camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
@@ -4208,7 +4090,19 @@ function updateMultiClient(){
     camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
   }
 
-  // ── HUD ───────────────────────────────────────────
+  // fog 업데이트
+  if(tick%4===0) updateFog();
+
+  // 파티클
+  let pi=0;
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vx*=0.88; p.vy*=0.88; p.life--;
+    if(p.life>0) particles[pi++]=p;
+  }
+  particles.length=pi;
+
+  // HUD
   if(tick%6===0) updateMobileSkillHUD();
 }
 
@@ -4219,8 +4113,8 @@ function loop(t=0){
   lastT=t;
 
   if(multiMode){
-    // 멀티: update()에서 서버 처리 부분만 스킵하고 나머지는 싱글과 동일
-    update();
+    // 멀티: 서버가 게임 로직 처리, 클라이언트는 렌더+카메라+입력만
+    updateMultiClient(); // 카메라·dash 물리·fog 등 클라이언트 처리
     draw();
     multiDrawPlayers();
     return;
@@ -4255,10 +4149,9 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 // ══════════════════════════════════════════════════════
 //  멀티플레이어
 // ══════════════════════════════════════════════════════
-var multiMode=false, multiWs=null, currentServerUrl='';
-var multiState=null;
-var myMultiId=null, myColorIdx=0;
-// _pickedItemIds (declared at top)
+let multiMode=false, multiWs=null, currentServerUrl='';
+let multiState=null;
+let myMultiId=null, myColorIdx=0;
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
@@ -4424,9 +4317,6 @@ function connectMultiWs(url, joinMsg){
       bullets       = [];
       bombs         = [];
       items         = [];
-      _pickedItemIds.clear();
-      skillCd.bomb=0; skillCd.shield=0; skillCd.thunder=0;
-      shieldActive=0;
       // camX, camY는 첫 state에서 점프하므로 리셋 안 함
       tick=0;
       window._fog2=null; window._fog2C=null;
@@ -4464,19 +4354,12 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        // 위치: 서버와 너무 멀리 차이나면(>80px) 보정, 아니면 예측값 유지
-        const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
-        if(posDiff>80 || !player.alive){
-          player.x=me.x; player.y=me.y; // 서버 위치로 snap
-        } else if(posDiff>20){
-          player.x+=(me.x-player.x)*0.3; // 부드럽게 보정
-          player.y+=(me.y-player.y)*0.3;
-        }
-        // HP/상태는 서버 값 그대로
+        player.x=me.x; player.y=me.y;
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         player.iframes=me.iframes;
         player.shieldActive=me.shieldActive||0;
+        player.facing=me.facing||0;
         if(!player.charId) player.charId=me.charId||(window._charIdMap&&window._charIdMap[me.id])||selectedChar||'photo0';
       }
 
@@ -4489,10 +4372,7 @@ function connectMultiWs(url, joinMsg){
       }
 
       // 아이템 전역변수 주입
-      // 픽업한 아이템 제외하고 주입
-      if(msg.items) items=(msg.items||[])
-        .filter(it=>!_pickedItemIds.has(it.id))
-        .map(it=>({...it,pulse:it.pulse||0,life:600}));
+      if(msg.items) items=(msg.items||[]).map(it=>({...it,pulse:it.pulse||0,life:600}));
 
       // 총알 렌더용 주입 (판정은 서버)
       if(msg.bullets) bullets=(msg.bullets||[]).map(b=>({
@@ -4598,29 +4478,25 @@ document.getElementById('waiting-leave-btn').addEventListener('click',()=>{
   document.getElementById('lobby').style.display='flex';
 });
 
-// ── 멀티 입력 전송 (매 프레임 전송 — 변경 여부 무관) ──
+// ── 멀티 입력 전송 ────────────────────────────────────
+let lastMultiInput={up:false,down:false,left:false,right:false};
 setInterval(()=>{
   if(!multiMode||!multiWs||multiWs.readyState!==1) return;
   const inp=buildInput();
-  multiWs.send(JSON.stringify({type:'input',input:inp}));
-},1000/30); // 30fps 전송 (서버는 60fps 처리)
+  if(JSON.stringify(inp)!==JSON.stringify(lastMultiInput)){
+    lastMultiInput=inp;
+    multiWs.send(JSON.stringify({type:'input',input:inp}));
+  }
+},1000/60);
 
 // buildInput 함수
 function buildInput(){
-  let up   = !!(keys['ArrowUp']   ||keys['w']||keys['W']);
-  let down = !!(keys['ArrowDown'] ||keys['s']||keys['S']);
-  let left = !!(keys['ArrowLeft'] ||keys['a']||keys['A']);
-  let right= !!(keys['ArrowRight']||keys['d']||keys['D']);
-  // 모바일 조이스틱 입력 포함
-  if(typeof joyState!=='undefined' && joyState.active){
-    const dz=0.25;
-    if(joyState.dy < -dz) up   =true;
-    if(joyState.dy >  dz) down =true;
-    if(joyState.dx < -dz) left =true;
-    if(joyState.dx >  dz) right=true;
-  }
-  return{ up, down, left, right,
-    mouseAngle: window._multiMouseAngle||player?.facing||0,
+  return{
+    up:   !!(keys['ArrowUp']   ||keys['w']||keys['W']),
+    down: !!(keys['ArrowDown'] ||keys['s']||keys['S']),
+    left: !!(keys['ArrowLeft'] ||keys['a']||keys['A']),
+    right:!!(keys['ArrowRight']||keys['d']||keys['D']),
+    mouseAngle: window._multiMouseAngle||0,
   };
 }
 
@@ -4813,7 +4689,7 @@ const SHOP_ITEMS = [
   { id:'speed2',  name:'스피드 업',    emoji:'👟', desc:'속도 부스트 +3초',  cost:25,  type:'consumable' },
 ];
 
-var _shopNextStage=1;
+let _shopNextStage=1;
 
 function showShop(nextStage){
   _shopNextStage=nextStage;
