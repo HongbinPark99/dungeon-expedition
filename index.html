@@ -1762,7 +1762,6 @@ function doDash(){
   }
   if(!player||!player.alive) return;
   if(player.dashCd>0) return;
-  if(!gameRunning) return;
   // 이동 방향 또는 facing 방향으로 대시
   const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
   const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
@@ -2028,7 +2027,12 @@ function update(){
     const dx=player.x-m.x, dy=player.y-m.y;
     const d2=dx*dx+dy*dy, d=Math.sqrt(d2);
     if(d2>SIGHT_R*SIGHT_R*9&&tick%2!==0) return;
-    const aggroR = m.type&&m.type.startsWith('boss')?700:300;
+    const isBoss = m.type&&m.type.startsWith('boss');
+    // 보스는 플레이어가 보스 방 안에 들어올 때만 움직임
+    const playerInBossArena = bossArena &&
+      player.x>bossArena.x && player.x<bossArena.x+bossArena.w &&
+      player.y>bossArena.y && player.y<bossArena.y+bossArena.h;
+    const aggroR = isBoss ? (playerInBossArena ? 9999 : 0) : 300;
 
     // 이동
     if(d<aggroR && d>m.range*0.75){
@@ -2038,8 +2042,8 @@ function update(){
       m.x=r.x; m.y=r.y;
     }
 
-    m.attackCd--;
-    m.warnPhase = m.attackCd<=m.warn && m.attackCd>0 && d<m.range*2.2;
+    if(!isBoss || playerInBossArena) m.attackCd--;
+    m.warnPhase = m.attackCd<=m.warn && m.attackCd>0 && d<m.range*2.2 && (!isBoss||playerInBossArena);
 
     // 격노
     if(m.type&&m.type.startsWith('boss')&&!m.enraged&&m.hp<m.maxHp*0.5){
@@ -4174,6 +4178,7 @@ function showStageCleared(){
   const nextBossL=MTYPE[nextBossT]?.label||'???';
   msg.innerHTML=`
     처치: ${kills}마리 &nbsp;|&nbsp; 누적: ${totalKills+kills}마리<br>
+    <span style="font-size:.95rem;color:#ffd700;font-weight:bold;">💰 보유 골드: ${gold}G</span><br>
     <span style="font-size:.8rem;color:#aac">다음 스테이지 등장: ${nextPreview}</span><br>
     <span style="font-size:.8rem;color:#f84">보스: ${MEMOJI[nextBossT]||'👑'} ${nextBossL}</span>
   `;
@@ -4182,7 +4187,7 @@ function showStageCleared(){
   btn.textContent='🛒 상점에서 강화하기';
   btn.onclick=()=>{
     ov.style.display='none';
-    showShop(stage+1); // 상점 표시
+    showShop(stage+1);
   };
   // 처음부터 버튼 추가
   let restartBtn=document.getElementById('restart-from-1');
