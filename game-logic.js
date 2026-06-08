@@ -2492,14 +2492,14 @@ const CHAR_DRAW = {
 // ── 몬스터 그리기 래퍼 ───────────────────────────────
 // 몬스터 타입별 사진 매핑
 const MONSTER_PHOTO = {
-  goblin:'ferris_right', skeleton:'ferris_left', slime:'ferris_front',
-  orc:'airport_left', archer:'airport_cap', shade:'ferris_mid',
-  berserker:'airport_tall', mage:'ferris_left', hunter:'jeju_right',
-  bomber:'ferris_right', vampire:'ferris_mid',
-  golem:'airport_left', wraith:'ferris_left', hydra:'ferris_mid',
-  lich:'ferris_front', dragon:'airport_mid', demon:'ferris_left',
-  boss:'ferris_front', boss2:'airport_left', boss3:'ferris_mid',
-  boss4:'airport_tall', boss5:'ferris_right',
+  goblin:'photo0', skeleton:'photo1', slime:'photo2',
+  orc:'photo3', archer:'photo4', shade:'photo0',
+  berserker:'photo1', mage:'photo2', hunter:'photo3',
+  bomber:'photo4', vampire:'photo0',
+  golem:'photo1', wraith:'photo2', hydra:'photo3',
+  lich:'photo4', dragon:'photo0', demon:'photo1',
+  boss:'photo2', boss2:'photo3', boss3:'photo4',
+  boss4:'photo0', boss5:'photo1',
 };
 const MONSTER_COLOR = {
   goblin:'#2a4a1a', skeleton:'#2a2a3a', slime:'#1a3a1a',
@@ -2662,11 +2662,12 @@ function drawPlayerSprite(c, sx, sy, facing, blinking, alive, colorIdx, charId){
   c.globalAlpha = !alive?0.3:blinking?0.5:1;
   const bob=Math.sin(tick*0.18)*2;
   const photoMap = {
-    player:'ferris_front', char_headphone:'airport_left',
-    char_cap:'airport_cap', char_thumbsup:'airport_mid',
-    char_tall:'airport_tall', char_longcoat:'jeju_right',
-    char_ferris_left:'ferris_left', char_ferris_mid:'ferris_mid',
-    char_ferris_right:'ferris_right', char_ferris_front:'ferris_front',
+    // photo0~4만 PHOTO_B64에 있음
+    player:'photo0', char_headphone:'photo0',
+    char_cap:'photo1', char_thumbsup:'photo2',
+    char_tall:'photo3', char_longcoat:'photo4',
+    char_ferris_left:'photo0', char_ferris_mid:'photo1',
+    char_ferris_right:'photo2', char_ferris_front:'photo3',
     photo0:'photo0', photo1:'photo1', photo2:'photo2', photo3:'photo3', photo4:'photo4',
   };
   // charId 결정: 전달된 charId → charIdMap → selectedChar → 기본값
