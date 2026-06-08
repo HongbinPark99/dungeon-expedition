@@ -418,6 +418,11 @@ wss.on('connection',ws=>{
 
     if(playerRoom.state!=='playing')return;
     if(msg.type==='input'){player.input=msg.input;if(typeof msg.input?.mouseAngle==='number')player.facing=msg.input.mouseAngle;return;}
+    if(msg.type==='pickup'&&msg.itemId){
+      // 클라이언트가 픽업한 아이템 서버에서 제거
+      room.items=room.items.filter(it=>it.id!==msg.itemId);
+      return;
+    }
     if(msg.type==='attack'&&player.alive){
       playerRoom.bullets.push({x:player.x,y:player.y,angle:player.facing||0,speed:11,dmg:30,life:70,isMob:false,pid});
       broadcastRoom(playerRoom,{type:'attack_fx',x:player.x,y:player.y,pid});return;
