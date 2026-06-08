@@ -343,6 +343,33 @@ canvas{display:block;cursor:none;}
   #mm-wrap{ bottom:210px;right:8px; }
   #log{ bottom:210px; }
 }
+
+/* ── 상점 ── */
+#shop-screen{
+  display:none;position:fixed;inset:0;z-index:100;
+  background:rgba(5,8,16,0.97);backdrop-filter:blur(8px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  font-family:'Black Han Sans',sans-serif;
+}
+#shop-screen .shop-title{font-size:1.6rem;color:#ffd700;letter-spacing:3px;margin-bottom:6px;}
+#shop-screen .shop-sub{font-size:.8rem;color:#88aacc;margin-bottom:18px;}
+#shop-gold-display{font-size:1.1rem;color:#ffd700;background:#12141f;
+  border:1px solid #ffd70055;border-radius:8px;padding:6px 20px;margin-bottom:16px;}
+#shop-items{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
+  max-width:680px;margin-bottom:20px;}
+.shop-item{width:140px;background:#0d0f1e;border:2px solid #2a2d50;border-radius:10px;
+  padding:12px 8px;text-align:center;cursor:pointer;transition:.15s;user-select:none;}
+.shop-item:hover:not(.cant-afford){border-color:#ffd700;background:#16182e;}
+.shop-item.cant-afford{opacity:.4;cursor:not-allowed;}
+.shop-item.bought{border-color:#44dd88;background:#0a1a10;}
+.shop-item .si-emoji{font-size:1.8rem;margin-bottom:4px;}
+.shop-item .si-name{font-size:.72rem;color:#dde;font-weight:bold;}
+.shop-item .si-desc{font-size:.62rem;color:#667;margin-top:2px;}
+.shop-item .si-cost{font-size:.8rem;color:#ffd700;margin-top:4px;}
+#shop-close-btn{background:linear-gradient(135deg,#e63,#a22);color:#fff;
+  border:none;border-radius:10px;padding:12px 40px;font-family:inherit;
+  font-size:1rem;cursor:pointer;letter-spacing:2px;}
+#shop-close-btn:hover{background:linear-gradient(135deg,#f74,#c33);}
 </style>
 </head>
 <body>
@@ -703,22 +730,36 @@ function buildMap(){
   }
 
   // ── 보스 방 (오른쪽 하단, 고정) ───────────────────
-  const bArena={x:MAP_W-920, y:MAP_H-840, w:880, h:800};
-  const bc=Math.floor(bArena.x/TILE), br2=Math.floor(bArena.y/TILE);
-  const bw=Math.ceil(bArena.w/TILE), bh=Math.ceil(bArena.h/TILE);
+  // 보스방 위치 랜덤 (맵 바깥 여백 제외, 4분면 중 랜덤 선택)
+  const BW=880, BH=800;
+  const quadrants=[
+    {x:COLS-Math.ceil(BW/TILE)-4, y:ROWS-Math.ceil(BH/TILE)-4}, // 우하
+    {x:4,                          y:ROWS-Math.ceil(BH/TILE)-4}, // 좌하
+    {x:COLS-Math.ceil(BW/TILE)-4, y:4},                          // 우상
+    {x:4,                          y:4},                          // 좌상
+  ];
+  // 플레이어 시작(좌상)에서 멀리: 스테이지별 다른 분면
+  const qIdx=(stage-1)%4;
+  const chosen=quadrants[qIdx];
+  const bArena={x:chosen.x*TILE, y:chosen.y*TILE, w:BW, h:BH};
+  const bc=chosen.x, br2=chosen.y;
+  const bw=Math.ceil(BW/TILE), bh=Math.ceil(BH/TILE);
   for(let r=br2;r<br2+bh;r++)
     for(let c=bc;c<bc+bw;c++) setTile(c,r,0);
-  // 보스 방 입구 여러 방향
+  // 입구 통로 (보스방 방향에 따라)
   const ey=br2+(bh>>1);
+  const ex=bc+(bw>>1);
   for(let r=ey-5;r<=ey+5;r++)
-    for(let c=bc-10;c<=bc;c++) setTile(c,r,0);
-  // 보스 방과 가장 가까운 방 연결
-  let closest=rooms[0], closestD=Infinity;
+    for(let c=Math.max(1,bc-8);c<=bc+bw+8&&c<COLS-1;c++) setTile(c,r,0);
+  for(let c=ex-5;c<=ex+5;c++)
+    for(let r=Math.max(1,br2-8);r<=br2+bh+8&&r<ROWS-1;r++) setTile(c,r,0);
+  // 보스방과 가장 가까운 방 연결
+  let closest=rooms[0]||{cx:ex,cy:ey}, closestD=Infinity;
   rooms.forEach(rm=>{
-    const d=Math.hypot(rm.cx*TILE-bArena.x,rm.cy*TILE-bArena.y);
+    const d=Math.hypot(rm.cx-ex, rm.cy-ey);
     if(d<closestD){closestD=d;closest=rm;}
   });
-  carveCorridor(closest.cx,closest.cy,Math.floor(bArena.x/TILE)+bw/2|0,ey);
+  carveCorridor(closest.cx,closest.cy,ex,ey);
 
   return { rooms, bArena };
 }
@@ -1063,10 +1104,18 @@ function getMobileInput(){
 // 모바일 쿨다운 HUD 업데이트
 function updateMobileSkillHUD(){
   if(!mobileActive) return;
+  // 멀티모드: Date.now() 기반 쿨다운 계산
+  let bombCd=skillCd.bomb, shieldCd=skillCd.shield, thunderCd=skillCd.thunder;
+  if(multiMode){
+    const now=Date.now();
+    bombCd    = Math.max(0, Math.ceil((6000-(now-(window._multiLastBomb||0)))/1000*60));
+    shieldCd  = Math.max(0, Math.ceil((8000-(now-(window._multiLastShield||0)))/1000*60));
+    thunderCd = Math.max(0, Math.ceil((5000-(now-(window._multiLastThunder||0)))/1000*60));
+  }
   const skills = [
-    {id:'m-bomb',    cdId:'m-cd-bomb',    cd:skillCd.bomb,    max:CD_BOMB},
-    {id:'m-shield',  cdId:'m-cd-shield',  cd:skillCd.shield,  max:CD_SHIELD},
-    {id:'m-thunder', cdId:'m-cd-thunder', cd:skillCd.thunder, max:CD_THUNDER},
+    {id:'m-bomb',    cdId:'m-cd-bomb',    cd:bombCd,    max:CD_BOMB},
+    {id:'m-shield',  cdId:'m-cd-shield',  cd:shieldCd,  max:CD_SHIELD},
+    {id:'m-thunder', cdId:'m-cd-thunder', cd:thunderCd, max:CD_THUNDER},
   ];
   skills.forEach(s=>{
     const el  = document.getElementById(s.id);
@@ -1366,7 +1415,7 @@ function initGame(keepStage=false){
   gameOver     = false;
   kills        = 0;
   tick         = 0;
-  if(!keepStage) gold=0;
+  if(!keepStage){ gold=0; window._atkBonus=0; }
   spawnTimer   = 0;
   logEntries   = [];
   screenShake  = 0;
@@ -1574,10 +1623,13 @@ function spawnBoss(){
     size:  cfg.size+Math.min(stage-1,5),
     score: (cfg.score*stage)|0,
     col:   cfg.col,
-    attackStyle:cfg.attackStyle,
+    // 보스 패턴 랜덤 (매 스폰마다 다름)
+    attackStyle: ['fill_cross','fill_scatter','fill_ring','fill_cone','fill_line'][Math.random()*5|0],
     attackCd:80, warnPhase:false, alive:true,
     enraged:false, phase:0,
     aimAngle:0, bossPhase:0,
+    // 생김새 변형 (색조 랜덤)
+    colVariant: ['#f40','#c0f','#0af','#ff0','#f00','#4f0','#f80'][Math.random()*7|0],
   });
   bossSpawned=true;
   screenShake=60;
@@ -1645,7 +1697,7 @@ function doAttack(){
     }
     return;
   }
-  if(!gameRunning||!player.alive||player.attackCd>0) return;
+  if(!gameRunning||!player||!player.alive||player.attackCd>0) return;
   const wp=WEAPONS[player.weapon]||WEAPONS.sword;
   player.attackCd=wp.cd;
   const angle=player.facing!==undefined?player.facing:0;
@@ -1658,7 +1710,7 @@ function doAttack(){
       vx:Math.cos(a)*wp.spd,
       vy:Math.sin(a)*wp.spd,
       dist:0,angle:a,alive:true,
-      dmgOverride:wp.dmg,
+      dmgOverride:wp.dmg+(window._atkBonus||0),
       pierce:wp.pierce,
       range:wp.range,
       col:wp.col,
@@ -1671,17 +1723,18 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
+    if(!gameRunning&&!multiState) return;
     const now=Date.now();
     if(!window._multiLastBomb) window._multiLastBomb=0;
-    if(now-window._multiLastBomb < 6000) return; // CD_BOMB=360프레임=6초
+    if(now-window._multiLastBomb < 6000) return;
     window._multiLastBomb=now;
     if(multiWs&&multiWs.readyState===1){
       multiWs.send(JSON.stringify({type:'bomb'}));
-      SFX.explode();
+      try{SFX.explode();}catch(e){}
     }
     return;
   }
-  if(!gameRunning||!player.alive||skillCd.bomb>0) return;
+  if(!gameRunning||!player||!player.alive||skillCd.bomb>0) return;
   skillCd.bomb=CD_BOMB;
   SFX.explode();
   const angle=player.facing!==undefined?player.facing:0;
@@ -1706,7 +1759,7 @@ function doSkillShield(){
     }
     return;
   }
-  if(!gameRunning||!player.alive||skillCd.shield>0) return;
+  if(!gameRunning||!player||!player.alive||skillCd.shield>0) return;
   skillCd.shield=CD_SHIELD;
   SFX.shield();
   shieldActive=120; // 2초 방패
@@ -1725,7 +1778,7 @@ function doSkillThunder(){
     }
     return;
   }
-  if(!gameRunning||!player.alive||skillCd.thunder>0) return;
+  if(!gameRunning||!player||!player.alive||skillCd.thunder>0) return;
   skillCd.thunder=CD_THUNDER;
   // 주변 반경 180 내 모든 몬스터에 번개 피해
   const THUNDER_R=180, THUNDER_DMG=55;
@@ -1746,7 +1799,12 @@ function doSkillThunder(){
 
 function killMonster(m){
   m.alive=false; kills++;
+  // 골드 획득 (몬스터 점수 기반)
+  const earnedGold = m.elite ? (m.score/3|0)+10 : (m.score/5|0)+2;
+  gold += earnedGold;
   spawnParticles(m.x,m.y,'#ffd700',16);
+  // 골드 획득 텍스트 (간헐적)
+  if(earnedGold>=5) addLog(`💰 +${earnedGold}G`,'win');
   // 아이템 드랍 (30% 확률)
   if(Math.random()<0.30){
     const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
@@ -2145,6 +2203,8 @@ function update(){
     document.getElementById('s-kills').textContent=kills;
     document.getElementById('s-stage').textContent=stage;
     document.getElementById('s-total').textContent=totalKills+kills;
+    const goldEl=document.getElementById('s-gold');
+    if(goldEl) goldEl.textContent=gold;
     const sg=document.getElementById('s-gold');
     if(sg) sg.textContent=gold;
     const skillDefs=[
@@ -3479,7 +3539,7 @@ function drawCharFerrisFront(c,x,y,sz,facing,t,elite){
 
 
 // ── 보스 픽셀아트 (스테이지별 완전 다른 생김새) ─────
-function drawBossReplace(c,x,y,sz,f,t,enraged,type){
+function drawBossReplace(c,x,y,sz,f,t,enraged,type,m){
   const s=Math.max(2,sz*0.22)|0;
   const pulse=0.92+0.08*Math.sin(t*0.08);
   const ox=x-7*s, oy=y-9*s;
@@ -3631,10 +3691,10 @@ const CHAR_DRAW = {
   dragon:    (c,x,y,sz,f,t,e)=>drawCharFerrisMid(c,x,y,sz,f,t,e),
   demon:     (c,x,y,sz,f,t,e)=>drawCharFerrisRight(c,x,y,sz,f,t,e),
   boss:      (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss'),
-  boss2:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss2'),
-  boss3:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss3'),
-  boss4:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss4'),
-  boss5:     (c,x,y,sz,f,t,e)=>drawBossReplace(c,x,y,sz,f,t,e,'boss5'),
+  boss2:     (c,x,y,sz,f,t,e,m)=>drawBossReplace(c,x,y,sz,f,t,e,'boss2',m),
+  boss3:     (c,x,y,sz,f,t,e,m)=>drawBossReplace(c,x,y,sz,f,t,e,'boss3',m),
+  boss4:     (c,x,y,sz,f,t,e,m)=>drawBossReplace(c,x,y,sz,f,t,e,'boss4',m),
+  boss5:     (c,x,y,sz,f,t,e,m)=>drawBossReplace(c,x,y,sz,f,t,e,'boss5',m),
 };
 
 // ── 몬스터 그리기 래퍼 ───────────────────────────────
@@ -3952,7 +4012,7 @@ function showStageCleared(){
   `;
   // 버튼을 "다음 스테이지"로 변경
   const btn=document.getElementById('retry-btn');
-  btn.textContent=`스테이지 ${stage+1} 진입`;
+  btn.textContent='🛒 상점에서 강화하기';
   btn.onclick=()=>{
     ov.style.display='none';
     showShop(stage+1); // 상점 표시
@@ -4578,6 +4638,40 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 // ═══════════════════════════════════════════════════════
 //  상점 시스템
 // ═══════════════════════════════════════════════════════
+// 스테이지별 상점 아이템 풀
+function getShopItems(stg){
+  const base=[
+    { id:'hp30',    name:'소형 포션',  emoji:'🧪', desc:'HP +30',           cost:15,  type:'consumable' },
+    { id:'hp60',    name:'대형 포션',  emoji:'❤️', desc:'HP +60',           cost:28,  type:'consumable' },
+    { id:'maxhp',   name:'체력 강화',  emoji:'💪', desc:'최대 HP +20',       cost:50,  type:'upgrade'    },
+    { id:'bomb',    name:'폭탄 충전',  emoji:'💣', desc:'폭탄 쿨 초기화',    cost:20,  type:'consumable' },
+    { id:'shield',  name:'방패 충전',  emoji:'🛡', desc:'방패 쿨 초기화',    cost:20,  type:'consumable' },
+    { id:'thunder', name:'번개 충전',  emoji:'⚡', desc:'번개 쿨 초기화',    cost:20,  type:'consumable' },
+    { id:'speed2',  name:'부스트',     emoji:'👟', desc:'속도 +30초',        cost:25,  type:'consumable' },
+  ];
+  const stage2plus=[
+    { id:'weapon_pistol',  name:'권총',      emoji:'🔫', desc:'빠른 단발',  cost:40, type:'weapon' },
+    { id:'weapon_shotgun', name:'산탄총',    emoji:'💥', desc:'5발 산탄',   cost:55, type:'weapon' },
+    { id:'weapon_smg',     name:'기관단총',  emoji:'⚡', desc:'고속 연사',  cost:60, type:'weapon' },
+  ];
+  const stage3plus=[
+    { id:'weapon_rifle',   name:'저격총',    emoji:'🎯', desc:'관통·고뎀',  cost:80,  type:'weapon' },
+    { id:'weapon_laser',   name:'레이저',    emoji:'🔴', desc:'관통 레이저', cost:85, type:'weapon' },
+    { id:'cd_reduce',      name:'쿨다운 감소',emoji:'⏱',desc:'스킬CD -20%',cost:70, type:'upgrade' },
+  ];
+  const stage4plus=[
+    { id:'weapon_cannon',  name:'캐논',      emoji:'💣', desc:'초고데미지',  cost:100, type:'weapon' },
+    { id:'weapon_twin',    name:'쌍권총',    emoji:'🔫', desc:'2발 동시',    cost:90,  type:'weapon' },
+    { id:'atk_up',         name:'공격력 강화',emoji:'⚔', desc:'ATK +10',    cost:80,  type:'upgrade' },
+  ];
+  let pool=[...base];
+  if(stg>=2) pool=[...pool,...stage2plus];
+  if(stg>=3) pool=[...pool,...stage3plus];
+  if(stg>=4) pool=[...pool,...stage4plus];
+  // 랜덤 6~8개 선택
+  const shuffled=pool.sort(()=>Math.random()-.5);
+  return shuffled.slice(0,Math.min(8,shuffled.length));
+}
 const SHOP_ITEMS = [
   { id:'hp30',    name:'소형 포션',    emoji:'🧪', desc:'HP +30 회복',      cost:15,  type:'consumable' },
   { id:'hp60',    name:'대형 포션',    emoji:'❤️', desc:'HP +60 회복',      cost:28,  type:'consumable' },
@@ -4600,12 +4694,17 @@ let _shopNextStage=1;
 function showShop(nextStage){
   _shopNextStage=nextStage;
   const scr=document.getElementById('shop-screen');
+  if(!scr) return;
   const gd=document.getElementById('shop-gold-display');
   const si=document.getElementById('shop-items');
-  gd.textContent=`💰 ${gold} 골드`;
+  const stageLabel=document.getElementById('shop-stage-label');
+  if(stageLabel) stageLabel.textContent=`스테이지 ${nextStage} 준비 — 골드로 강화하세요`;
+  if(gd) gd.textContent=`💰 ${gold} 골드`;
 
+  // 스테이지별 아이템 풀
+  const shopPool=getShopItems(nextStage);
   // 현재 무기 제외, 살 수 있는 아이템 표시
-  si.innerHTML=SHOP_ITEMS.map(item=>{
+  if(si) si.innerHTML=shopPool.map(item=>{
     const canAfford=gold>=item.cost;
     const isCurrentWeapon=item.type==='weapon'&&player&&player.weapon===item.wid;
     return `<div style="background:#0b0d1e;border:1px solid ${canAfford&&!isCurrentWeapon?'#2a4050':'#1a1d30'};
@@ -4625,7 +4724,7 @@ function showShop(nextStage){
           </button>`
       }
     </div>`;
-  }).join('');
+  }).join('')||'<div style="color:#667">구매 가능한 아이템 없음</div>';
 
   scr.style.display='flex';
   SFX.door&&SFX.door();
@@ -4674,5 +4773,15 @@ if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
 });
 
 </script>
+
+<!-- ── 상점 ── -->
+<div id="shop-screen">
+  <div class="shop-title">⚔ 스테이지 클리어 상점</div>
+  <div class="shop-sub" id="shop-stage-label">다음 스테이지를 대비해 강화하세요</div>
+  <div id="shop-gold-display">💰 0 골드</div>
+  <div id="shop-items"></div>
+  <button id="shop-close-btn">다음 스테이지 진입 →</button>
+</div>
+
 </body>
 </html>
