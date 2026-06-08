@@ -580,12 +580,6 @@ var screenShake=0, spawnTimer=0, logEntries=[];
 var _shopNextStage=1, alertTimer=0;
 var _pickedItemIds=new Set();
 // ────────────────────────────────────────────────────
-// ── 전역 변수 (TDZ 방지 - 스크립트 최상단 선언) ──
-// (above vars declared at top)
-// rafId declared at top
-// lastT/accumT declared at top
-var mouseAttacking=false;
-var nextId=1;
 var _pickedItemIds=new Set();
 // ═══════════════════════════════════════════════════════
 //  상수
@@ -4264,7 +4258,7 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 var multiMode=false, multiWs=null, currentServerUrl='';
 var multiState=null;
 var myMultiId=null, myColorIdx=0;
-const _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
+// _pickedItemIds (declared at top)
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
