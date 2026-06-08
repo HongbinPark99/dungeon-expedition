@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -1779,7 +1777,7 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
-    if(!gameRunning&&!multiState) return;
+    if(!multiState&&!player) return;
     const now=Date.now();
     if(!window._multiLastBomb) window._multiLastBomb=0;
     if(now-window._multiLastBomb < 6000) return;
@@ -1790,7 +1788,6 @@ function doSkillBomb(){
     }
     // 로컬 쿨다운 UI 즉시 반영
     skillCd.bomb=360;
-    updateSkillHUD&&updateSkillHUD();
     addLog('💣 폭탄 투척!');
     return;
   }
@@ -1820,7 +1817,6 @@ function doSkillShield(){
     // 로컬 쿨다운 UI + 방패 이펙트 즉시 반영
     skillCd.shield=480;
     shieldActive=120;
-    updateSkillHUD&&updateSkillHUD();
     addLog('🛡 방패막 발동! 2초간 무적');
     return;
   }
@@ -1843,7 +1839,6 @@ function doSkillThunder(){
     }
     // 로컬 쿨다운 UI + 번개 이펙트 즉시 반영
     skillCd.thunder=300;
-    updateSkillHUD&&updateSkillHUD();
     if(player){
       const THUNDER_R=180, THUNDER_DMG=55;
       monsters.forEach(m=>{
@@ -4184,6 +4179,51 @@ function updateMultiClient(){
 
   // HUD
   if(tick%6===0) updateMobileSkillHUD();
+
+  // ── 멀티 아이템 픽업 ──
+  if(player && player.alive){
+    items.forEach(it=>{
+      it.pulse=(it.pulse||0)+1;
+      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
+        // 서버에 픽업 알림
+        if(multiWs && multiWs.readyState===1){
+          multiWs.send(JSON.stringify({type:'pickup', itemId:it.id}));
+        }
+        // 로컬 즉시 반영 (서버 응답 전 UX)
+        it.life=0;
+        try{SFX.item();}catch(e){}
+        if(it.type==='hp'){
+          player.hp=Math.min(player.maxHp||120, player.hp+30);
+          addLog('❤️ HP +30 회복','win');
+        } else if(it.type==='bomb_charge'){
+          skillCd.bomb=0;
+          addLog('💣 폭탄 충전!','win');
+        } else if(it.type==='shield_charge'){
+          skillCd.shield=0;
+          addLog('🛡 방패 충전!','win');
+        } else if(it.type==='thunder_charge'){
+          skillCd.thunder=0;
+          addLog('⚡ 번개 충전!','win');
+        } else if(it.type==='speed'){
+          player.speedBoost=(player.speedBoost||0)+180;
+          addLog('👟 속도 부스트!','win');
+        } else if(it.type&&it.type.startsWith('weapon_')){
+          const wid=it.type.slice(7);
+          const wp2=WEAPONS[wid];
+          if(wp2){ player.weapon=wid; addLog(`${wp2.emoji} ${wp2.name} 획득!`,'win'); updateWeaponHUD(); }
+        }
+        const icol=it.type.startsWith('weapon_')?WEAPONS[it.type.slice(7)]?.col||'#ffd':ITEM_COL[it.type]||'#ffd';
+        spawnParticles(it.x,it.y,icol,12);
+      }
+    });
+    items=items.filter(it=>it.life>0);
+  }
+
+  // ── 멀티 스킬 쿨다운 카운트다운 ──
+  if(skillCd.bomb>0)    skillCd.bomb--;
+  if(skillCd.shield>0)  skillCd.shield--;
+  if(skillCd.thunder>0) skillCd.thunder--;
+  if(shieldActive>0)    shieldActive--;
 }
 
 
