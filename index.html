@@ -789,7 +789,7 @@ var camX=0, camY=0;
 var kills=0, tick=0, gold=0;
 var bullets=[], bombs=[], dangerZonesFx=[], items=[];
 var skillCd={bomb:0, shield:0, thunder:0};
-var shieldActive=0;
+var shieldActive=0; // 방패 지속 프레임
 var bossArena, bossSpawned=false, bossDefeated=false;
 var gameRunning=false, gameWon=false, gameOver=false;
 var screenShake=0;
@@ -1869,7 +1869,6 @@ function spawnParticles(x,y,col,n=6){
 //  업데이트
 // ═══════════════════════════════════════════════════════
 function update(){
-  // 멀티모드도 update() 실행 (서버 처리 부분만 스킵)
   if(!gameRunning && !multiMode) return;
   if(!player) return;
   tick++;
@@ -2064,11 +2063,7 @@ function update(){
     const toSpawn=Math.min(4,30-normal);
     for(let i=0;i<toSpawn;i++) spawnMonster();
   }
-  if(!multiMode){
-    let mfi=0;
-    for(let i=0;i<monsters.length;i++){if(monsters[i].alive)monsters[mfi++]=monsters[i];}
-    monsters.length=mfi;
-  }
+  if(!multiMode){let mfi=0;for(let i=0;i<monsters.length;i++){if(monsters[i].alive)monsters[mfi++]=monsters[i];}monsters.length=mfi;}
 
   // ── 쿨다운 감소 ──────────────────────────────────
   if(skillCd.bomb>0)    skillCd.bomb--;
@@ -4077,8 +4072,8 @@ function showEnding(won){
 // ═══════════════════════════════════════════════════════
 //  메인 루프
 // ═══════════════════════════════════════════════════════
-let rafId=null;
-let lastT=0, accumT=0;
+var rafId=null;
+var lastT=0, accumT=0;
 const FIXED_DT=1000/60; // 고정 60fps 업데이트
 
 // ── 멀티 클라이언트 업데이트 (카메라·dash·fog) ────────
@@ -4237,7 +4232,7 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 var multiMode=false, multiWs=null, currentServerUrl='';
 var multiState=null;
 var myMultiId=null, myColorIdx=0;
-var _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
+const _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
