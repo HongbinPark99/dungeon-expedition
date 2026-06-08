@@ -4059,12 +4059,31 @@ function updateMultiClient(){
   tick++;
   if(!player) return;
 
-  // 마우스 facing
+  // 마우스 facing 업데이트
   if(player.alive){
     player.facing=Math.atan2(
       (mouse.y+camY)-player.y,
       (mouse.x+camX)-player.x
     );
+  }
+
+  // ── 클라이언트 예측 이동 (서버 응답 전 즉시 반영) ──
+  if(player.alive){
+    const inp=buildInput();
+    let dx=0, dy=0;
+    if(inp.up)   dy-=1;
+    if(inp.down) dy+=1;
+    if(inp.left) dx-=1;
+    if(inp.right)dx+=1;
+    if(dx&&dy){dx*=0.707;dy*=0.707;}
+    const spd=P_SPEED*(player.speedBoost>0?1.7:1);
+    if(dx||dy){
+      const nx=player.x+dx*spd, ny=player.y+dy*spd;
+      if(!isWall(nx,player.y)) player.x=nx;
+      if(!isWall(player.x,ny)) player.y=ny;
+      player.x=Math.max(TILE,Math.min(MAP_W-TILE,player.x));
+      player.y=Math.max(TILE,Math.min(MAP_H-TILE,player.y));
+    }
   }
 
   // 구르기 물리 (클라이언트 측 예측)
@@ -4354,12 +4373,19 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        player.x=me.x; player.y=me.y;
+        // 위치: 서버와 너무 멀리 차이나면(>80px) 보정, 아니면 예측값 유지
+        const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
+        if(posDiff>80 || !player.alive){
+          player.x=me.x; player.y=me.y; // 서버 위치로 snap
+        } else if(posDiff>20){
+          player.x+=(me.x-player.x)*0.3; // 부드럽게 보정
+          player.y+=(me.y-player.y)*0.3;
+        }
+        // HP/상태는 서버 값 그대로
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         player.iframes=me.iframes;
         player.shieldActive=me.shieldActive||0;
-        player.facing=me.facing||0;
         if(!player.charId) player.charId=me.charId||(window._charIdMap&&window._charIdMap[me.id])||selectedChar||'photo0';
       }
 
@@ -4478,25 +4504,29 @@ document.getElementById('waiting-leave-btn').addEventListener('click',()=>{
   document.getElementById('lobby').style.display='flex';
 });
 
-// ── 멀티 입력 전송 ────────────────────────────────────
-let lastMultiInput={up:false,down:false,left:false,right:false};
+// ── 멀티 입력 전송 (매 프레임 전송 — 변경 여부 무관) ──
 setInterval(()=>{
   if(!multiMode||!multiWs||multiWs.readyState!==1) return;
   const inp=buildInput();
-  if(JSON.stringify(inp)!==JSON.stringify(lastMultiInput)){
-    lastMultiInput=inp;
-    multiWs.send(JSON.stringify({type:'input',input:inp}));
-  }
-},1000/60);
+  multiWs.send(JSON.stringify({type:'input',input:inp}));
+},1000/30); // 30fps 전송 (서버는 60fps 처리)
 
 // buildInput 함수
 function buildInput(){
-  return{
-    up:   !!(keys['ArrowUp']   ||keys['w']||keys['W']),
-    down: !!(keys['ArrowDown'] ||keys['s']||keys['S']),
-    left: !!(keys['ArrowLeft'] ||keys['a']||keys['A']),
-    right:!!(keys['ArrowRight']||keys['d']||keys['D']),
-    mouseAngle: window._multiMouseAngle||0,
+  let up   = !!(keys['ArrowUp']   ||keys['w']||keys['W']);
+  let down = !!(keys['ArrowDown'] ||keys['s']||keys['S']);
+  let left = !!(keys['ArrowLeft'] ||keys['a']||keys['A']);
+  let right= !!(keys['ArrowRight']||keys['d']||keys['D']);
+  // 모바일 조이스틱 입력 포함
+  if(typeof joyState!=='undefined' && joyState.active){
+    const dz=0.25;
+    if(joyState.dy < -dz) up   =true;
+    if(joyState.dy >  dz) down =true;
+    if(joyState.dx < -dz) left =true;
+    if(joyState.dx >  dz) right=true;
+  }
+  return{ up, down, left, right,
+    mouseAngle: window._multiMouseAngle||player?.facing||0,
   };
 }
 
