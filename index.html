@@ -560,12 +560,12 @@ canvas{display:block;cursor:none;}
 // ═══════════════════════════════════════════════════════
 // 스테이지별 맵 크기 (스테이지 올라갈수록 넓어짐)
 const BASE_MAP_W = 4000, BASE_MAP_H = 3200;
-let MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
-let COLS = MAP_W / 48 | 0;
-let ROWS = MAP_H / 48 | 0;
+var MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
+var COLS = MAP_W / 48 | 0;
+var ROWS = MAP_H / 48 | 0;
 const TILE = 48;
-let stage = 1;
-let totalKills = 0; // 전체 누적 킬
+var stage = 1;
+var totalKills = 0; // 전체 누적 킬
 const SIGHT_R = 480;
 const P_SPEED = 2.0;
 const P_HP    = 120;
@@ -614,8 +614,8 @@ resizeCanvas();
 // ═══════════════════════════════════════════════════════
 //  맵 생성
 // ═══════════════════════════════════════════════════════
-let tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
-let explored;// Uint8Array COLS*ROWS  0/1
+var tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
+var explored;// Uint8Array COLS*ROWS  0/1
 
 function tileAt(c,r){
   if(c<0||c>=COLS||r<0||r>=ROWS) return 1;
@@ -784,7 +784,7 @@ function moveSlide(ox,oy,nx,ny,r=13){
 // ═══════════════════════════════════════════════════════
 //  게임 상태
 // ═══════════════════════════════════════════════════════
-var player, monsters=[], particles=[], attackFx=[];
+var player, monsters, particles, attackFx;
 var camX=0, camY=0;
 var kills=0, tick=0, gold=0;
 var bullets=[], bombs=[], dangerZonesFx=[], items=[];
@@ -800,7 +800,7 @@ var logEntries=[];
 // ═══════════════════════════════════════════════════════
 //  효과음 시스템 — Web Audio API 합성음
 // ═══════════════════════════════════════════════════════
-let _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
+var _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
 function _getACtx(){
   if(!_audioCtx)_audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   if(_audioCtx.state==='suspended')_audioCtx.resume();
@@ -936,8 +936,8 @@ function addMuteButton(){
 // ═══════════════════════════════════════════════════════
 //  모바일 컨트롤
 // ═══════════════════════════════════════════════════════
-let isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-let mobileActive = false;
+var isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+var mobileActive = false;
 
 // 조이스틱 상태
 const joyState = { dx:0, dy:0, active:false, id:-1 };
@@ -1002,7 +1002,7 @@ function initMobileControls(){
   const aimStick   = document.getElementById('aim-joystick-stick');
   const AIM_BASE_R  = 72; // 더 큰 반지름
   const aimJoyState = {dx:0, dy:0, active:false, id:-1};
-  let   aimFireInterval = null;
+  var   aimFireInterval = null;
 
   function aimJoyMove(cx, cy, ox, oy){
     let dx=cx-ox, dy=cy-oy;
@@ -1364,7 +1364,7 @@ function drawPhotoMonster(c, photoKey, cx, cy, sz, bodyColor, enraged, warnPhase
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
 const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
-let mouseAttacking=false; // 마우스 버튼 홀드 시 연사
+var mouseAttacking=false; // 마우스 버튼 홀드 시 연사
 
 canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
@@ -1529,7 +1529,7 @@ const MEMOJI={
   boss:'👑', boss2:'🌑', boss3:'❄️', boss4:'⚡', boss5:'💀',
 };
 
-let nextId=1;
+var nextId=1;
 
 // ── 스테이지별 몬스터 풀 계산 ─────────────────────────
 function getMonsterPool(stg){
@@ -1869,8 +1869,8 @@ function spawnParticles(x,y,col,n=6){
 //  업데이트
 // ═══════════════════════════════════════════════════════
 function update(){
+  // 멀티모드도 update() 실행 (서버 처리 부분만 스킵)
   if(!gameRunning && !multiMode) return;
-  if(!player) return;
   tick++;
 
   // ── 플레이어 이동 ─────────────────────────────────
@@ -2063,7 +2063,9 @@ function update(){
     const toSpawn=Math.min(4,30-normal);
     for(let i=0;i<toSpawn;i++) spawnMonster();
   }
-  if(!multiMode){let mfi=0;for(let i=0;i<monsters.length;i++){if(monsters[i].alive)monsters[mfi++]=monsters[i];}monsters.length=mfi;}
+  let mfi=0;
+  for(let i=0;i<monsters.length;i++){if(monsters[i].alive)monsters[mfi++]=monsters[i];}
+  monsters.length=mfi;
 
   // ── 쿨다운 감소 ──────────────────────────────────
   if(skillCd.bomb>0)    skillCd.bomb--;
@@ -2291,7 +2293,7 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
 var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
 var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
-let _exploredVersion=0, _lastExploredVersion=-1;
+var _exploredVersion=0, _lastExploredVersion=-1;
 
 function _rebuildTileCache(){
   if(!_tileCanvas||_tileCanvas.width!==MAP_W||_tileCanvas.height!==MAP_H){
@@ -2344,7 +2346,7 @@ const _origUpdateFog=()=>{
 
 function draw(){
   // 멀티: player가 없으면 대기
-  if(multiMode && !player) return;
+  if(multiMode && (!player||!player.alive&&!multiState)) return;
   if(!multiMode && !gameRunning) return;
   if(!player) return;
 
@@ -3995,7 +3997,7 @@ function addLog(msg,type=''){
   el.innerHTML=logEntries.slice(0,7).map(e=>`<div class="le${e.type?' '+e.type:''}">${e.msg}</div>`).join('');
 }
 
-let alertTimer=0;
+var alertTimer=0;
 function showAlert(msg){
   const el=document.getElementById('alert');
   document.getElementById('alert-msg').textContent=msg;
@@ -4652,7 +4654,11 @@ function updateMultiHUD(players){
 
 // 멀티 키 입력은 doAttack/doSkill 함수에서 처리
 
-// ── 멀티 렌더링 ──────────────────────────────────────
+// ── 멀티 렌더링 — update/draw 함수 분기 ──────────────
+const _origUpdate=update;
+const _origDraw=draw;
+
+// update/draw 를 멀티 모드일 때 서버 상태로 대체
 const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 // ── 멀티: 다른 플레이어 오버레이 ─────────────────────
 function multiDrawPlayers(){
@@ -4783,7 +4789,7 @@ const SHOP_ITEMS = [
   { id:'speed2',  name:'스피드 업',    emoji:'👟', desc:'속도 부스트 +3초',  cost:25,  type:'consumable' },
 ];
 
-let _shopNextStage=1;
+var _shopNextStage=1;
 
 function showShop(nextStage){
   _shopNextStage=nextStage;
