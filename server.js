@@ -417,9 +417,22 @@ wss.on('connection',ws=>{
     }
 
     if(playerRoom.state!=='playing')return;
-    if(msg.type==='ping'){return;} // heartbeat - 연결 유지용
+    if(msg.type==='ping'){return;}
     if(msg.type==='input'){player.input=msg.input;if(typeof msg.input?.mouseAngle==='number')player.facing=msg.input.mouseAngle;return;}
-    // pickup은 아래 통합 처리
+    if(msg.type==='pickup'){
+      const it=playerRoom.items&&playerRoom.items.find(i=>i.id===msg.itemId);
+      if(!it){return;}
+      if(Math.hypot(it.x-player.x,it.y-player.y)>150){return;}
+      playerRoom.items=playerRoom.items.filter(i=>i.id!==msg.itemId);
+      if(it.type==='hp')             player.hp=Math.min(player.maxHp||120,player.hp+30);
+      if(it.type==='bomb_charge')    player.bombCd=0;
+      if(it.type==='shield_charge')  player.shieldActive=180;
+      if(it.type==='thunder_charge') player.thunderCd=0;
+      if(it.type==='speed')          player.speedBoost=(player.speedBoost||0)+180;
+      if(it.type&&it.type.startsWith('weapon_')) player.weapon=it.type.slice(7);
+      broadcastRoom(playerRoom,{type:'item_pickup',pid,itemId:it.id,itemType:it.type});
+      return;
+    }
     if(msg.type==='attack'&&player.alive){
       playerRoom.bullets.push({x:player.x,y:player.y,angle:player.facing||0,speed:11,dmg:30,life:70,isMob:false,pid});
       broadcastRoom(playerRoom,{type:'attack_fx',x:player.x,y:player.y,pid});return;
@@ -428,28 +441,8 @@ wss.on('connection',ws=>{
       for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
     }
     if(msg.type==='dash'&&player.alive){
-      // 서버에서 대시: iframes 부여
       player.iframes=14;
       broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
-      return;
-    }
-    if(msg.type==='pickup'){
-      if(!room||!room.items) return;
-      const it=room.items.find(i=>i.id===msg.itemId);
-      if(!it){ return; } // 이미 다른 플레이어가 먹었거나 없음
-      // 거리 체크 완화 (네트워크 지연 고려, 150px)
-      if(Math.hypot(it.x-player.x,it.y-player.y)>150){ return; }
-      // 아이템 제거
-      room.items=room.items.filter(i=>i.id!==msg.itemId);
-      // 아이템 효과 서버에서 적용
-      if(it.type==='hp')             player.hp=Math.min(player.maxHp||120, player.hp+30);
-      if(it.type==='bomb_charge')    player.bombCd=0;
-      if(it.type==='shield_charge')  player.shieldActive=180;
-      if(it.type==='thunder_charge') player.thunderCd=0;
-      if(it.type==='speed')          player.speedBoost=180;
-      if(it.type&&it.type.startsWith('weapon_')) player.weapon=it.type.slice(7);
-      // 브로드캐스트 (다른 클라에서 아이템 사라지게)
-      broadcastRoom(room,{type:'item_pickup',pid,itemId:it.id,itemType:it.type});
       return;
     }
     if(msg.type==='shield'&&player.alive){player.shieldActive=180;return;}
