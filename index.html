@@ -784,17 +784,17 @@ function moveSlide(ox,oy,nx,ny,r=13){
 // ═══════════════════════════════════════════════════════
 //  게임 상태
 // ═══════════════════════════════════════════════════════
-let player, monsters, particles, attackFx;
-let camX=0, camY=0;
-let kills=0, tick=0, gold=0;
-let bullets=[], bombs=[], dangerZonesFx=[], items=[];
-let skillCd={bomb:0, shield:0, thunder:0};
-let shieldActive=0; // 방패 지속 프레임
-let bossArena, bossSpawned=false, bossDefeated=false;
-let gameRunning=false, gameWon=false, gameOver=false;
-let screenShake=0;
-let spawnTimer=0;
-let logEntries=[];
+var player, monsters=[], particles=[], attackFx=[];
+var camX=0, camY=0;
+var kills=0, tick=0, gold=0;
+var bullets=[], bombs=[], dangerZonesFx=[], items=[];
+var skillCd={bomb:0, shield:0, thunder:0};
+var shieldActive=0;
+var bossArena, bossSpawned=false, bossDefeated=false;
+var gameRunning=false, gameWon=false, gameOver=false;
+var screenShake=0;
+var spawnTimer=0;
+var logEntries=[];
 
 
 // ═══════════════════════════════════════════════════════
@@ -1159,7 +1159,7 @@ const CUSTOM_CHAR_DRAW = {
   photo4: (c,x,y,sz,f,t)=>drawPhotoChar(c,'photo4',x,y,sz,'#cc88ff',t),
 };
 
-let selectedChar = 'photo0';
+var selectedChar = 'photo0';
 
 function buildCharSelectUI(){
   const container = document.getElementById('char-cards');
@@ -2294,8 +2294,8 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
-let _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
-let _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
+var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
+var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
 let _exploredVersion=0, _lastExploredVersion=-1;
 
 function _rebuildTileCache(){
@@ -4234,10 +4234,10 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 // ══════════════════════════════════════════════════════
 //  멀티플레이어
 // ══════════════════════════════════════════════════════
-let multiMode=false, multiWs=null, currentServerUrl='';
-let multiState=null;
-let myMultiId=null, myColorIdx=0;
-const _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
+var multiMode=false, multiWs=null, currentServerUrl='';
+var multiState=null;
+var myMultiId=null, myColorIdx=0;
+var _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
@@ -4657,11 +4657,7 @@ function updateMultiHUD(players){
 
 // 멀티 키 입력은 doAttack/doSkill 함수에서 처리
 
-// ── 멀티 렌더링 — update/draw 함수 분기 ──────────────
-const _origUpdate=update;
-const _origDraw=draw;
-
-// update/draw 를 멀티 모드일 때 서버 상태로 대체
+// ── 멀티 렌더링 ──────────────────────────────────────
 const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 // ── 멀티: 다른 플레이어 오버레이 ─────────────────────
 function multiDrawPlayers(){
