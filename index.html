@@ -1746,8 +1746,9 @@ function doDash(){
     try{SFX.dash();}catch(e){}
     return;
   }
-  if(!gameRunning||!player.alive) return;
+  if(!player||!player.alive) return;
   if(player.dashCd>0) return;
+  if(!gameRunning) return;
   // 이동 방향 또는 facing 방향으로 대시
   const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
   const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
@@ -2149,47 +2150,48 @@ function update(){
   if(shieldActive>0)    shieldActive--;
 
   // ── 아이템 픽업 (싱글 전용) ──────────────────────
-  if(!multiMode) items.forEach(it=>{
-    it.life--; it.pulse++;
-    if(!player.alive) return;
-    if(Math.hypot(it.x-player.x,it.y-player.y)<22){
-      it.life=0;
-      SFX.item();
-      if(it.type==='hp'){
-        player.hp=Math.min(player.maxHp,player.hp+30);
-        // HP 숫자 즉시 업데이트 (버그 수정)
-        const hn=document.getElementById('hn0');
-        const hf=document.getElementById('hf0');
-        if(hn) hn.textContent=Math.max(0,player.hp)+' / '+player.maxHp;
-        if(hf) hf.style.width=Math.max(0,player.hp/player.maxHp*100)+'%';
-        addLog('❤️ HP +30 회복','win');
-      } else if(it.type==='bomb_charge'){
-        skillCd.bomb=0;
-        addLog('💣 폭탄 충전!','win');
-      } else if(it.type==='shield_charge'){
-        skillCd.shield=0;
-        addLog('🛡 방패 충전!','win');
-      } else if(it.type==='thunder_charge'){
-        skillCd.thunder=0;
-        addLog('⚡ 번개 충전!','win');
-      } else if(it.type==='speed'){
-        player.speedBoost=(player.speedBoost||0)+180;
-        addLog('👟 속도 부스트 3초!','win');
-      }
-      else if(it.type&&it.type.startsWith('weapon_')){
-        const wid=it.type.slice(7);const wp2=WEAPONS[wid];
-        if(wp2){
-          const prev=WEAPONS[player.weapon]||WEAPONS.sword;
-          player.weapon=wid; player.attackCd=0;
-          addLog(`${wp2.emoji} ${wp2.name} 획득! (${prev.emoji}→${wp2.emoji})  ${wp2.desc}`,'win');
-          updateWeaponHUD();
+  if(!multiMode){
+    items.forEach(it=>{
+      it.life--; it.pulse++;
+      if(!player.alive) return;
+      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
+        it.life=0;
+        try{SFX.item();}catch(e){}
+        if(it.type==='hp'){
+          player.hp=Math.min(player.maxHp,player.hp+30);
+          const hn=document.getElementById('hn0');
+          const hf=document.getElementById('hf0');
+          if(hn) hn.textContent=Math.max(0,player.hp)+' / '+player.maxHp;
+          if(hf) hf.style.width=Math.max(0,player.hp/player.maxHp*100)+'%';
+          addLog('❤️ HP +30 회복','win');
+        } else if(it.type==='bomb_charge'){
+          skillCd.bomb=0;
+          addLog('💣 폭탄 충전!','win');
+        } else if(it.type==='shield_charge'){
+          skillCd.shield=0;
+          addLog('🛡 방패 충전!','win');
+        } else if(it.type==='thunder_charge'){
+          skillCd.thunder=0;
+          addLog('⚡ 번개 충전!','win');
+        } else if(it.type==='speed'){
+          player.speedBoost=(player.speedBoost||0)+180;
+          addLog('👟 속도 부스트 3초!','win');
+        } else if(it.type&&it.type.startsWith('weapon_')){
+          const wid=it.type.slice(7);
+          const wp2=WEAPONS[wid];
+          if(wp2){
+            const prev=WEAPONS[player.weapon]||WEAPONS.sword;
+            player.weapon=wid; player.attackCd=0;
+            addLog(`${wp2.emoji} ${wp2.name} 획득! (${prev.emoji}→${wp2.emoji})  ${wp2.desc}`,'win');
+            updateWeaponHUD();
+          }
         }
+        const icol=it.type.startsWith('weapon_')?WEAPONS[it.type.slice(7)]?.col||'#ffd':ITEM_COL[it.type]||'#ffd';
+        spawnParticles(it.x,it.y,icol,12);
       }
-      const icol=it.type.startsWith('weapon_')?WEAPONS[it.type.slice(7)]?.col||'#ffd':ITEM_COL[it.type]||'#ffd';
-      spawnParticles(it.x,it.y,icol,12);
-    }
-  });
-  items=items.filter(it=>it.life>0);
+    });
+    items=items.filter(it=>it.life>0);
+  }
   if(player.speedBoost>0) player.speedBoost--;
 
   // ── 폭탄 업데이트 ────────────────────────────────
@@ -4346,7 +4348,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else buildCharSelectUI();
 document.getElementById('retry-btn').addEventListener('click',()=>{
   document.getElementById('ending').style.display='none';
-  if(multiMode) connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
+  if(multiMode && currentServerUrl) connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
   else initGame(false);
 });
 document.getElementById('game').addEventListener('click',()=>canvas.focus());
@@ -4922,6 +4924,8 @@ function showShop(nextStage){
   const stageLabel=document.getElementById('shop-stage-label');
   if(stageLabel) stageLabel.textContent=`스테이지 ${nextStage} 준비 — 골드로 강화하세요`;
   if(gd) gd.textContent=`💰 ${gold} 골드`;
+  // HUD gold도 동기화
+  const sgEl=document.getElementById('s-gold'); if(sgEl) sgEl.textContent=gold;
 
   // 스테이지별 아이템 풀
   const shopPool=getShopItems(nextStage);
@@ -4987,22 +4991,29 @@ function buyShopItem(itemId){
   }
 
   // 골드/HUD 즉시 갱신
-  document.getElementById('shop-gold-display').textContent=`💰 ${gold} 골드`;
-  const sg=document.getElementById('s-gold'); if(sg) sg.textContent=gold;
-  const hn=document.getElementById('hn0');
-  const hf=document.getElementById('hf0');
-  if(hn) hn.textContent=Math.max(0,player.hp)+' / '+player.maxHp;
-  if(hf) hf.style.width=Math.max(0,player.hp/player.maxHp*100)+'%';
+  const _gd=document.getElementById('shop-gold-display'); if(_gd) _gd.textContent=`💰 ${gold} 골드`;
+  const _sg=document.getElementById('s-gold'); if(_sg) _sg.textContent=gold;
+  const _hn=document.getElementById('hn0');
+  const _hf=document.getElementById('hf0');
+  if(_hn) _hn.textContent=Math.max(0,player.hp)+' / '+player.maxHp;
+  if(_hf) _hf.style.width=Math.max(0,player.hp/player.maxHp*100)+'%';
+  updateWeaponHUD();
   // 상점 새로고침
   showShop(_shopNextStage);
 }
 
 const _shopCloseBtn=document.getElementById('shop-close-btn');
 if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
-  const shopScreen=document.getElementById('shop-screen');
-  if(shopScreen) shopScreen.style.display='none';
+  document.getElementById('shop-screen').style.display='none';
   stage=_shopNextStage;
   if(player) player.hp=Math.min(player.maxHp, player.hp+40);
+  initGame(true);
+});
+// 건너뛰기 버튼 (상점 생략하고 바로 다음 스테이지)
+const _shopSkipBtn=document.getElementById('shop-skip-btn');
+if(_shopSkipBtn) _shopSkipBtn.addEventListener('click',()=>{
+  document.getElementById('shop-screen').style.display='none';
+  stage=_shopNextStage;
   initGame(true);
 });
 
@@ -5010,7 +5021,11 @@ if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
 
 <!-- ── 상점 ── -->
 <div id="shop-screen">
-  <div class="shop-title">⚔ 스테이지 클리어 상점</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;width:100%;max-width:700px;margin-bottom:4px;">
+    <div class="shop-title" style="margin-bottom:0;">⚔ 스테이지 클리어 상점</div>
+    <button id="shop-skip-btn" style="background:#333;color:#aaa;border:1px solid #444;border-radius:8px;
+      padding:6px 14px;font-size:.78rem;cursor:pointer;font-family:inherit;">✕ 건너뛰기</button>
+  </div>
   <div class="shop-sub" id="shop-stage-label">다음 스테이지를 대비해 강화하세요</div>
   <div id="shop-gold-display">💰 0 골드</div>
   <div id="shop-items"></div>
