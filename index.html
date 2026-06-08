@@ -1517,21 +1517,31 @@ function initGame(keepStage=false){
   const initCount = 28 + (stage-1)*8;
   for(let i=0;i<initCount;i++) spawnMonster();
 
+  // 캐릭터/닉네임 (최초 스테이지만)
   if(stage===1){
     applySelectedChar();
     const nn=window.playerNickname||'용사';
     const el=document.getElementById('player-hud-name');
     if(el) el.textContent=nn;
+  }
+
   // 재생 반지 효과
   if(window._regenActive && keepStage){ player.hp=Math.min(player.maxHp, player.hp+10); }
+
+  // 공통 초기화 (모든 스테이지)
   startBGM(); setBGMStage(stage); addMuteButton();
   updateWeaponHUD();
   if(isMobile&&!mobileActive) initMobileControls();
-  addLog('⚔ 던전 탐험을 시작합니다!','win');
+
+  const themeName = (typeof MAP_THEMES!=='undefined') ? MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)].name : '';
+  if(stage===1){
+    addLog('⚔ 던전 탐험을 시작합니다!','win');
     addLog('보스 방을 찾아 던전의 군주를 처치하라!');
   } else {
-    addLog(`🗺 스테이지 ${stage} 진입! 맵이 넓어졌다...`,'win');
-    addLog('더 강한 몬스터들이 기다리고 있다!','dmg');
+    addLog(`🗺 스테이지 ${stage} 진입! ${themeName} 탐험 시작`,'win');
+    addLog(`💰 보유 골드: ${gold}G — 보스를 처치하라!`,'win');
+    const bCfg=MTYPE[getBossType(stage)];
+    if(bCfg) addLog(`👑 이번 스테이지 보스: ${bCfg.label} — ${bCfg.desc||''}`, 'boss');
   }
 
   // 게임 UI
@@ -1886,12 +1896,7 @@ function doSkillThunder(){
 
 function killMonster(m){
   m.alive=false; kills++;
-  // 골드 획득 (몬스터 점수 기반)
-  const earnedGold = m.elite ? (m.score/3|0)+10 : (m.score/5|0)+2;
-  gold += earnedGold;
   spawnParticles(m.x,m.y,'#ffd700',16);
-  // 골드 획득 텍스트 (간헐적)
-  if(earnedGold>=5) addLog(`💰 +${earnedGold}G`,'win');
   // 아이템 드랍 (30% 확률)
   if(Math.random()<0.30){
     const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
@@ -1906,17 +1911,18 @@ function killMonster(m){
   if(m.type&&m.type.startsWith('boss')){
     bossDefeated=true; gameRunning=false;
     totalKills+=kills;
+    const bossGold = stage * 80;
+    gold += bossGold;
     const nextBossType=getBossType(stage+1);
     const nextBossCfg=MTYPE[nextBossType];
-    gold += stage * 80; // 보스 처치 골드 보너스
     SFX.stageClear(); setBGMStage(stage+1);
-    addLog(`🏆 스테이지 ${stage} 보스 처치! +${stage*80}💰`,'win');
+    addLog(`🏆 스테이지 ${stage} 보스 처치! +${bossGold}💰`,'win');
     if(nextBossCfg) addLog(`다음: ${MEMOJI[nextBossType]||'👑'} ${nextBossCfg.label}이(가) 기다린다...`,'boss');
     setTimeout(()=>showStageCleared(),800);
   } else {
-    const g=Math.floor(m.score/2)+Math.floor(Math.random()*5);
-    gold+=g;
-    addLog(`${MEMOJI[m.type]||'👾'} ${m.label||m.type} 처치! +${g}💰`,'kill');
+    const g = m.elite ? (m.score/2|0)+15 : (m.score/4|0)+3;
+    gold += g;
+    if(g>=5) addLog(`${MEMOJI[m.type]||'👾'} ${m.label||m.type} 처치! +${g}💰`,'kill');
   }
 }
 
@@ -2142,17 +2148,13 @@ function update(){
   if(skillCd.thunder>0) skillCd.thunder--;
   if(shieldActive>0)    shieldActive--;
 
-  // ── 아이템 픽업 ──────────────────────────────────
-  items.forEach(it=>{
+  // ── 아이템 픽업 (싱글 전용) ──────────────────────
+  if(!multiMode) items.forEach(it=>{
     it.life--; it.pulse++;
     if(!player.alive) return;
     if(Math.hypot(it.x-player.x,it.y-player.y)<22){
       it.life=0;
       SFX.item();
-      // 멀티: 서버에 픽업 알림 (서버가 실제 처리)
-      if(multiMode && multiWs && multiWs.readyState===1){
-        multiWs.send(JSON.stringify({type:'pickup', itemId:it.id}));
-      }
       if(it.type==='hp'){
         player.hp=Math.min(player.maxHp,player.hp+30);
         // HP 숫자 즉시 업데이트 (버그 수정)
@@ -4262,11 +4264,13 @@ function updateMultiClient(){
   if(tick%6===0) updateMobileSkillHUD();
 
   // ── 멀티 아이템 픽업 ──
+  if(!window._pickedItems) window._pickedItems=new Set();
   if(player && player.alive){
     items.forEach(it=>{
       it.pulse=(it.pulse||0)+1;
-      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
-        // 서버에 픽업 알림
+      if(Math.hypot(it.x-player.x,it.y-player.y)<22 && !window._pickedItems.has(it.id)){
+        window._pickedItems.add(it.id);
+        // 서버에 픽업 알림 (1회만)
         if(multiWs && multiWs.readyState===1){
           multiWs.send(JSON.stringify({type:'pickup', itemId:it.id}));
         }
@@ -4594,7 +4598,14 @@ function connectMultiWs(url, joinMsg){
       }
 
       // 아이템 전역변수 주입
-      if(msg.items) items=(msg.items||[]).map(it=>({...it,pulse:it.pulse||0,life:600}));
+      if(msg.items){
+        items=(msg.items||[]).map(it=>({...it,pulse:it.pulse||0,life:600}));
+        // 서버에서 사라진 아이템은 pickedItems에서도 제거
+        if(window._pickedItems){
+          const serverIds=new Set(msg.items.map(i=>i.id));
+          window._pickedItems.forEach(id=>{ if(!serverIds.has(id)) window._pickedItems.delete(id); });
+        }
+      }
 
       // 총알 렌더용 주입 (판정은 서버)
       if(msg.bullets) bullets=(msg.bullets||[]).map(b=>({
@@ -4603,10 +4614,11 @@ function connectMultiWs(url, joinMsg){
         col:b.col||'#f44',len:24,w:4,dmgOverride:0,pierce:false,range:9999,
       }));
 
-      // 스테이지/킬 동기화
+      // 스테이지/킬/골드 동기화
       if(msg.stage) stage=msg.stage;
       kills=msg.kills||0;
       totalKills=msg.totalKills||0;
+      if(msg.gold!=null){ gold=msg.gold; const sg=document.getElementById('s-gold'); if(sg) sg.textContent=gold; }
       gameRunning=true;
       bossSpawned=msg.bossSpawned||false;
 
