@@ -1660,11 +1660,11 @@ function doDash(){
     // 클라이언트 즉시 예측 (싱글과 동일 물리)
     if(player&&player.alive){
       const ang=player.facing||0;
-      player.dashVx=Math.cos(ang)*8;
-      player.dashVy=Math.sin(ang)*8;
-      player.dashFrames=12;
-      player.dashCd=180;
-      player.iframes=20;
+      player.dashVx=Math.cos(ang)*DASH_SPEED;
+      player.dashVy=Math.sin(ang)*DASH_SPEED;
+      player.dashFrames=DASH_FRAMES;
+      player.dashCd=DASH_CD;
+      player.iframes=DASH_IFRAMES;
     }
     try{SFX.dash();}catch(e){}
     return;
@@ -1723,15 +1723,20 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
-    if(!gameRunning&&!multiState) return;
-    const now=Date.now();
-    if(!window._multiLastBomb) window._multiLastBomb=0;
-    if(now-window._multiLastBomb < 6000) return;
-    window._multiLastBomb=now;
-    if(multiWs&&multiWs.readyState===1){
+    if(!multiState&&!gameRunning) return;
+    if(skillCd.bomb>0) return; // 클라이언트 쿨다운 체크
+    skillCd.bomb=CD_BOMB;      // 즉시 쿨다운 적용
+    if(multiWs&&multiWs.readyState===1)
       multiWs.send(JSON.stringify({type:'bomb'}));
-      try{SFX.explode();}catch(e){}
+    // 클라이언트 즉시 폭탄 생성 (시각 피드백)
+    if(player&&player.alive){
+      const angle=player.facing||0;
+      bombs.push({x:player.x,y:player.y,
+        vx:Math.cos(angle)*5,vy:Math.sin(angle)*5,
+        dist:0,maxDist:200,exploded:false,explodeTimer:0,
+        radius:0,maxRadius:90,alive:true});
     }
+    try{SFX.explode();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.bomb>0) return;
@@ -1749,14 +1754,12 @@ function doSkillBomb(){
 
 function doSkillShield(){
   if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastShield) window._multiLastShield=0;
-    if(now-window._multiLastShield < 8000) return; // CD_SHIELD=480프레임=8초
-    window._multiLastShield=now;
-    if(multiWs&&multiWs.readyState===1){
+    if(skillCd.shield>0) return;
+    skillCd.shield=CD_SHIELD;
+    shieldActive=120;
+    if(multiWs&&multiWs.readyState===1)
       multiWs.send(JSON.stringify({type:'shield'}));
-      SFX.shield();
-    }
+    try{SFX.shield();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.shield>0) return;
@@ -1768,14 +1771,16 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastThunder) window._multiLastThunder=0;
-    if(now-window._multiLastThunder < 5000) return; // CD_THUNDER=300프레임=5초
-    window._multiLastThunder=now;
-    if(multiWs&&multiWs.readyState===1){
+    if(skillCd.thunder>0) return;
+    skillCd.thunder=CD_THUNDER;
+    if(multiWs&&multiWs.readyState===1)
       multiWs.send(JSON.stringify({type:'thunder'}));
-      SFX.thunder&&SFX.thunder();
+    // 클라이언트 즉시 이펙트
+    if(player&&player.alive){
+      spawnParticles(player.x,player.y,'#aaff00',12);
+      dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#ccff44',type:'thunder'});
     }
+    try{SFX.thunder&&SFX.thunder();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.thunder>0) return;
@@ -1936,6 +1941,12 @@ function update(){
       const nx=m.x+(dx/d)*spd, ny=m.y+(dy/d)*spd;
       const r=moveSlide(m.x,m.y,nx,ny,m.size*0.7);
       m.x=r.x; m.y=r.y;
+    }
+    // 보스는 bossArena 안에서만 이동
+    if(m.type&&m.type.startsWith('boss')&&bossArena){
+      const pad=m.size;
+      m.x=Math.max(bossArena.x+pad, Math.min(bossArena.x+bossArena.w-pad, m.x));
+      m.y=Math.max(bossArena.y+pad, Math.min(bossArena.y+bossArena.h-pad, m.y));
     }
 
     m.attackCd--;
@@ -4059,7 +4070,7 @@ function updateMultiClient(){
   tick++;
   if(!player) return;
 
-  // 마우스 facing 업데이트
+  // ── 마우스 facing ─────────────────────────────────
   if(player.alive){
     player.facing=Math.atan2(
       (mouse.y+camY)-player.y,
@@ -4067,14 +4078,14 @@ function updateMultiClient(){
     );
   }
 
-  // ── 클라이언트 예측 이동 (서버 응답 전 즉시 반영) ──
+  // ── 클라이언트 예측 이동 ───────────────────────────
   if(player.alive){
     const inp=buildInput();
-    let dx=0, dy=0;
-    if(inp.up)   dy-=1;
-    if(inp.down) dy+=1;
-    if(inp.left) dx-=1;
-    if(inp.right)dx+=1;
+    let dx=0,dy=0;
+    if(inp.up)    dy-=1;
+    if(inp.down)  dy+=1;
+    if(inp.left)  dx-=1;
+    if(inp.right) dx+=1;
     if(dx&&dy){dx*=0.707;dy*=0.707;}
     const spd=P_SPEED*(player.speedBoost>0?1.7:1);
     if(dx||dy){
@@ -4086,22 +4097,71 @@ function updateMultiClient(){
     }
   }
 
-  // 구르기 물리 (클라이언트 측 예측)
+  // ── 구르기 물리 ────────────────────────────────────
   if(player.dashFrames>0){
     const nx=player.x+player.dashVx;
     const ny=player.y+player.dashVy;
     if(!isWall(nx,player.y)) player.x=nx;
     if(!isWall(player.x,ny)) player.y=ny;
     player.dashFrames--;
-    player.dashVx*=0.85;
-    player.dashVy*=0.85;
+    player.dashVx*=0.88;
+    player.dashVy*=0.88;
   }
-  if(player.dashCd>0) player.dashCd--;
-  if(player.iframes>0) player.iframes--;
-  if(player.attackCd>0) player.attackCd--;
-  if(screenShake>0) screenShake--;
 
-  // 카메라 추적 (멀티도 동일하게)
+  // ── 쿨다운 감소 (싱글과 동일) ─────────────────────
+  if(player.dashCd>0)     player.dashCd--;
+  if(player.iframes>0)    player.iframes--;
+  if(player.attackCd>0)   player.attackCd--;
+  if(player.speedBoost>0) player.speedBoost--;
+  if(skillCd.bomb>0)      skillCd.bomb--;
+  if(skillCd.shield>0)    skillCd.shield--;
+  if(skillCd.thunder>0)   skillCd.thunder--;
+  if(shieldActive>0)      shieldActive--;
+  if(screenShake>0)       screenShake--;
+
+  // ── 아이템 픽업 (싱글과 동일 로직) ───────────────
+  if(player.alive){
+    items.forEach(it=>{
+      it.life--; it.pulse++;
+      if(it.life<=0) return;
+      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
+        it.life=0;
+        try{SFX.item();}catch(e){}
+        if(it.type==='hp'){
+          player.hp=Math.min(player.maxHp,player.hp+30);
+          addLog('❤️ HP +30','win');
+        } else if(it.type==='bomb_charge'){
+          skillCd.bomb=0; addLog('💣 폭탄 충전!','win');
+        } else if(it.type==='shield_charge'){
+          skillCd.shield=0; addLog('🛡 방패 충전!','win');
+        } else if(it.type==='thunder_charge'){
+          skillCd.thunder=0; addLog('⚡ 번개 충전!','win');
+        } else if(it.type==='speed'){
+          player.speedBoost=(player.speedBoost||0)+180;
+          addLog('👟 속도 부스트!','win');
+        } else if(it.type&&it.type.startsWith('weapon_')){
+          const wid=it.type.slice(7);
+          const wp2=WEAPONS&&WEAPONS[wid];
+          if(wp2){ player.weapon=wid; addLog(`${wp2.emoji} ${wp2.name} 획득!`,'win'); }
+        }
+      }
+    });
+    items=items.filter(it=>it.life>0);
+  }
+
+  // ── 파티클 ────────────────────────────────────────
+  let pi=0;
+  for(let i=0;i<particles.length;i++){
+    const p=particles[i];
+    p.x+=p.vx;p.y+=p.vy;p.vx*=0.88;p.vy*=0.88;p.life--;
+    if(p.life>0) particles[pi++]=p;
+  }
+  particles.length=pi;
+
+  // ── fog 업데이트 ──────────────────────────────────
+  if(tick%4===0) updateFog();
+
+  // ── 카메라 추적 ───────────────────────────────────
   if(player){
     const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
     camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
@@ -4109,19 +4169,7 @@ function updateMultiClient(){
     camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
   }
 
-  // fog 업데이트
-  if(tick%4===0) updateFog();
-
-  // 파티클
-  let pi=0;
-  for(let i=0;i<particles.length;i++){
-    const p=particles[i];
-    p.x+=p.vx; p.y+=p.vy; p.vx*=0.88; p.vy*=0.88; p.life--;
-    if(p.life>0) particles[pi++]=p;
-  }
-  particles.length=pi;
-
-  // HUD
+  // ── HUD ───────────────────────────────────────────
   if(tick%6===0) updateMobileSkillHUD();
 }
 
