@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -550,7 +551,13 @@ canvas{display:block;cursor:none;}
 </div>
 
 <script>
-'use strict';
+var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
+var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
+var rafId=null;
+var multiMode=false, multiWs=null, currentServerUrl='';
+var multiState=null;
+var myMultiId=null, myColorIdx=0;
+
 // ═══════════════════════════════════════════════════════
 //  상수
 // ═══════════════════════════════════════════════════════
@@ -857,45 +864,94 @@ function startBGM(){
     const ac=_getACtx();
     _bgmGain=ac.createGain();_bgmGain.gain.value=0.055;_bgmGain.connect(ac.destination);
 
-    // 저음 드론 베이스
-    [55,82.4].forEach(function(freq){
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sawtooth';o.frequency.value=freq;g.gain.value=0.28;
-      o.connect(g);g.connect(_bgmGain);o.start();_bgmOscs.push(o);
-    });
+    // ── 리버브(컨볼버) 생성 ──
+    function makeReverb(ac,sec,decay){
+      const len=ac.sampleRate*sec, buf=ac.createBuffer(2,len,ac.sampleRate);
+      for(let ch=0;ch<2;ch++){const d=buf.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}
+      const cv=ac.createConvolver();cv.buffer=buf;return cv;
+    }
+    const reverb=makeReverb(ac,2.2,3.0);
+    const reverbGain=ac.createGain();reverbGain.gain.value=0.38;
+    reverb.connect(reverbGain);reverbGain.connect(_bgmGain);
 
-    // 멜로디 패턴 (던전 분위기)
-    const melody=[220,247,262,220, 196,220,165,196, 220,247,294,262, 247,220,196,165];
-    const bass  =[55,55,55,55,    44,44,44,44,     55,55,55,55,    44,44,44,44];
+    // ── 패드 코드 (현악기 느낌) ──
+    const chords=[[130.8,164.8,196],[116.5,146.8,174.6],[98,123.5,146.8],[110,138.6,164.8]];
+    let chordIdx=0;
+    const padRid=setInterval(function(){
+      if(_sfxMuted||!_bgmGain){clearInterval(padRid);return;}
+      const freqs=chords[chordIdx%chords.length];
+      freqs.forEach(function(freq,i){
+        const o=ac.createOscillator(),g=ac.createGain();
+        o.type='sine';
+        o.frequency.value=freq;
+        o.detune.value=(i-1)*4; // 약간 디튠으로 두께감
+        const t=ac.currentTime;
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(0.18,t+0.6);
+        g.gain.setValueAtTime(0.18,t+3.0);
+        g.gain.linearRampToValueAtTime(0,t+4.0);
+        o.connect(g);g.connect(reverb);g.connect(_bgmGain);
+        o.start(t);o.stop(t+4.1);
+      });
+      chordIdx++;
+    },3800);
+    _bgmOscs.push({stop:function(){clearInterval(padRid);}});
+
+    // ── 멜로디 (벨 느낌 triangle+reverb) ──
+    const scale=[261.6,293.7,329.6,349.2,392,440,493.9,523.3,392,349.2,329.6,293.7,261.6,293.7,349.2,392];
+    const scaleTime=[0,0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5];
+    let loopStart=ac.currentTime+0.2;
+    function scheduleMelody(){
+      if(_sfxMuted||!_bgmGain) return;
+      scale.forEach(function(freq,i){
+        const o=ac.createOscillator(),g=ac.createGain();
+        o.type='triangle';
+        o.frequency.value=freq;
+        const t=loopStart+scaleTime[i];
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(0.22,t+0.05);
+        g.gain.exponentialRampToValueAtTime(0.001,t+0.42);
+        o.connect(g);g.connect(reverb);g.connect(_bgmGain);
+        o.start(t);o.stop(t+0.5);
+        _bgmOscs.push(o);
+      });
+      loopStart+=8.0;
+    }
+    scheduleMelody();
+    const melRid=setInterval(function(){
+      if(_sfxMuted||!_bgmGain){clearInterval(melRid);return;}
+      scheduleMelody();
+    },8000);
+    _bgmOscs.push({stop:function(){clearInterval(melRid);}});
+
+    // ── 베이스 펄스 (sine, 느리고 묵직하게) ──
+    const bassNotes=[65.4,61.7,55,58.3];
+    let bassIdx=0;
+    const bassRid=setInterval(function(){
+      if(_sfxMuted||!_bgmGain){clearInterval(bassRid);return;}
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.type='sine';o.frequency.value=bassNotes[bassIdx%bassNotes.length];
+      const t=ac.currentTime;
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.32,t+0.08);
+      g.gain.exponentialRampToValueAtTime(0.001,t+1.8);
+      o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+2.0);
+      bassIdx++;
+    },1900);
+    _bgmOscs.push({stop:function(){clearInterval(bassRid);}});
+
+    // ── 리듬 타악기 (소프트 킥+하이햇) ──
+    const BPM=90,SPB=60000/BPM;
     let beat=0;
-    const BPM=108, SPB=60000/BPM;
-    const rid=setInterval(function(){
-      if(_sfxMuted||!_bgmGain){clearInterval(rid);return;}
-      const b=beat%melody.length;
-      // 멜로디
-      if(beat%2===0){
-        const o=ac.createOscillator(),g=ac.createGain();
-        o.type='triangle';o.frequency.value=melody[b];
-        const t=ac.currentTime;
-        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.38,t+0.04);
-        g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*1.8);
-        o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*2);
-      }
-      // 킥
-      if(beat%4===0){_noise(0.08,0.014,60);}
-      // 하이햇
-      if(beat%2===0){_noise(0.03,0.008,3500);}
-      // 베이스 펄스
-      if(beat%4===0){
-        const o=ac.createOscillator(),g=ac.createGain();
-        o.type='sine';o.frequency.value=bass[b];
-        const t=ac.currentTime;
-        g.gain.setValueAtTime(0.45,t);g.gain.exponentialRampToValueAtTime(0.001,t+SPB/1000*3.5);
-        o.connect(g);g.connect(_bgmGain);o.start(t);o.stop(t+SPB/1000*4);
-      }
+    const drumRid=setInterval(function(){
+      if(_sfxMuted||!_bgmGain){clearInterval(drumRid);return;}
+      if(beat%4===0) _noise(0.06,0.018,55);     // 소프트 킥
+      if(beat%2===1) _noise(0.015,0.006,4000);  // 하이햇
+      if(beat%8===6) _noise(0.04,0.025,200);    // 스네어
       beat++;
     },SPB/2);
-    _bgmOscs.push({stop:function(){clearInterval(rid);}});
+    _bgmOscs.push({stop:function(){clearInterval(drumRid);}});
+
   }catch(e){}
 }
 function stopBGM(){
@@ -1732,6 +1788,10 @@ function doSkillBomb(){
       multiWs.send(JSON.stringify({type:'bomb'}));
       try{SFX.explode();}catch(e){}
     }
+    // 로컬 쿨다운 UI 즉시 반영
+    skillCd.bomb=360;
+    updateSkillHUD&&updateSkillHUD();
+    addLog('💣 폭탄 투척!');
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.bomb>0) return;
@@ -1757,6 +1817,11 @@ function doSkillShield(){
       multiWs.send(JSON.stringify({type:'shield'}));
       SFX.shield();
     }
+    // 로컬 쿨다운 UI + 방패 이펙트 즉시 반영
+    skillCd.shield=480;
+    shieldActive=120;
+    updateSkillHUD&&updateSkillHUD();
+    addLog('🛡 방패막 발동! 2초간 무적');
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.shield>0) return;
@@ -1776,6 +1841,20 @@ function doSkillThunder(){
       multiWs.send(JSON.stringify({type:'thunder'}));
       SFX.thunder&&SFX.thunder();
     }
+    // 로컬 쿨다운 UI + 번개 이펙트 즉시 반영
+    skillCd.thunder=300;
+    updateSkillHUD&&updateSkillHUD();
+    if(player){
+      const THUNDER_R=180, THUNDER_DMG=55;
+      monsters.forEach(m=>{
+        if(!m.alive) return;
+        if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
+          spawnParticles(m.x,m.y,'#ccf',10);
+        }
+      });
+      dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#aaf',type:'thunder'});
+    }
+    addLog('⚡ 번개 발동!');
     return;
   }
   if(!gameRunning||!player||!player.alive||skillCd.thunder>0) return;
@@ -2062,6 +2141,10 @@ function update(){
     if(Math.hypot(it.x-player.x,it.y-player.y)<22){
       it.life=0;
       SFX.item();
+      // 멀티: 서버에 픽업 알림 (서버가 실제 처리)
+      if(multiMode && multiWs && multiWs.readyState===1){
+        multiWs.send(JSON.stringify({type:'pickup', itemId:it.id}));
+      }
       if(it.type==='hp'){
         player.hp=Math.min(player.maxHp,player.hp+30);
         // HP 숫자 즉시 업데이트 (버그 수정)
@@ -2267,8 +2350,6 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
-let _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
-let _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
 let _exploredVersion=0, _lastExploredVersion=-1;
 
 function _rebuildTileCache(){
@@ -4050,7 +4131,6 @@ function showEnding(won){
 // ═══════════════════════════════════════════════════════
 //  메인 루프
 // ═══════════════════════════════════════════════════════
-let rafId=null;
 let lastT=0, accumT=0;
 const FIXED_DT=1000/60; // 고정 60fps 업데이트
 
@@ -4149,9 +4229,6 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 // ══════════════════════════════════════════════════════
 //  멀티플레이어
 // ══════════════════════════════════════════════════════
-let multiMode=false, multiWs=null, currentServerUrl='';
-let multiState=null;
-let myMultiId=null, myColorIdx=0;
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
