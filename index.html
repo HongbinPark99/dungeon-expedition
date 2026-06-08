@@ -560,6 +560,21 @@ canvas{display:block;cursor:none;}
 </div>
 
 <script>
+
+// ── WebSocket 안전 전송 래퍼 ─────────────────────────
+function wsSend(data){
+  if(!multiWs) return false;
+  if(multiWs.readyState !== WebSocket.OPEN) return false;
+  try{
+    multiWs.send(typeof data==='string' ? data : JSON.stringify(data));
+    return true;
+  } catch(e){
+    // 전송 실패해도 게임은 계속 진행
+    console.warn('[WS] send failed:', e.message);
+    return false;
+  }
+}
+
 var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
 var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
 var rafId=null;
@@ -1732,8 +1747,7 @@ function doDash(){
     if(!window._multiLastDash) window._multiLastDash=0;
     if(now-window._multiLastDash < 3000) return;
     window._multiLastDash=now;
-    if(multiWs&&multiWs.readyState===1)
-      multiWs.send(JSON.stringify({type:'dash'}));
+    wsSend({type:'dash'});
     // 클라이언트 즉시 예측 (싱글과 동일 물리)
     if(player&&player.alive){
       const ang=player.facing||0;
@@ -1769,10 +1783,8 @@ function doAttack(){
     if(!window._multiLastAttack) window._multiLastAttack=0;
     if(now-window._multiLastAttack < 400) return;
     window._multiLastAttack=now;
-    if(multiWs&&multiWs.readyState===1){
-      multiWs.send(JSON.stringify({type:'attack'}));
-      try{_getACtx();SFX.shoot();}catch(e){}
-    }
+    wsSend({type:'attack'});
+    try{_getACtx();SFX.shoot();}catch(e){}
     return;
   }
   if(!gameRunning||!player||!player.alive||player.attackCd>0) return;
@@ -1806,10 +1818,8 @@ function doSkillBomb(){
     if(!window._multiLastBomb) window._multiLastBomb=0;
     if(now-window._multiLastBomb < 6000) return;
     window._multiLastBomb=now;
-    if(multiWs&&multiWs.readyState===1){
-      multiWs.send(JSON.stringify({type:'bomb'}));
-      try{SFX.explode();}catch(e){}
-    }
+    wsSend({type:'bomb'});
+    try{SFX.explode();}catch(e){}
     // 로컬 쿨다운 UI 즉시 반영
     skillCd.bomb=360;
     addLog('💣 폭탄 투척!');
@@ -1834,10 +1844,8 @@ function doSkillShield(){
     if(!window._multiLastShield) window._multiLastShield=0;
     if(now-window._multiLastShield < 8000) return; // CD_SHIELD=480프레임=8초
     window._multiLastShield=now;
-    if(multiWs&&multiWs.readyState===1){
-      multiWs.send(JSON.stringify({type:'shield'}));
-      SFX.shield();
-    }
+    wsSend({type:'shield'});
+    SFX.shield();
     // 로컬 쿨다운 UI + 방패 이펙트 즉시 반영
     skillCd.shield=480;
     shieldActive=120;
@@ -1857,10 +1865,8 @@ function doSkillThunder(){
     if(!window._multiLastThunder) window._multiLastThunder=0;
     if(now-window._multiLastThunder < 5000) return; // CD_THUNDER=300프레임=5초
     window._multiLastThunder=now;
-    if(multiWs&&multiWs.readyState===1){
-      multiWs.send(JSON.stringify({type:'thunder'}));
-      SFX.thunder&&SFX.thunder();
-    }
+    wsSend({type:'thunder'});
+    SFX.thunder&&SFX.thunder();
     // 로컬 쿨다운 UI + 번개 이펙트 즉시 반영
     skillCd.thunder=300;
     if(player){
@@ -4218,6 +4224,7 @@ const FIXED_DT=1000/60; // 고정 60fps 업데이트
 function updateMultiClient(){
   tick++;
   if(!player) return;
+  // WS 연결 상태와 무관하게 로컬 물리/렌더는 계속
 
   // 마우스 facing
   if(player.alive){
@@ -4273,9 +4280,7 @@ function updateMultiClient(){
       if(Math.hypot(it.x-player.x,it.y-player.y)<22 && !window._pickedItems.has(it.id)){
         window._pickedItems.add(it.id);
         // 서버에 픽업 알림 (1회만)
-        if(multiWs && multiWs.readyState===1){
-          multiWs.send(JSON.stringify({type:'pickup', itemId:it.id}));
-        }
+        wsSend({type:'pickup', itemId:it.id});
         // 로컬 즉시 반영 (서버 응답 전 UX)
         it.life=0;
         try{SFX.item();}catch(e){}
@@ -4321,9 +4326,9 @@ function loop(t=0){
 
   if(multiMode){
     // 멀티: 서버가 게임 로직 처리, 클라이언트는 렌더+카메라+입력만
-    updateMultiClient(); // 카메라·dash 물리·fog 등 클라이언트 처리
-    draw();
-    multiDrawPlayers();
+    try{ updateMultiClient(); }catch(e){ console.warn('[multi update]',e); }
+    try{ draw(); }catch(e){ console.warn('[multi draw]',e); }
+    try{ multiDrawPlayers(); }catch(e){}
     return;
   }
 
@@ -4444,7 +4449,7 @@ function connectMultiWs(url, joinMsg){
   multiWs=new WebSocket(url);
   multiWs.onopen=()=>{
     setMultiStatus('연결됨! 방 입장 중...');
-    multiWs.send(JSON.stringify(joinMsg));
+    wsSend(joinMsg);
     // heartbeat - 30초마다 ping 전송으로 연결 유지
     if(window._heartbeatId) clearInterval(window._heartbeatId);
     window._heartbeatId=setInterval(()=>{
@@ -4455,15 +4460,28 @@ function connectMultiWs(url, joinMsg){
       }
     }, 25000);
   };
-  multiWs.onerror=()=>setMultiStatus('❌ 연결 실패. URL을 확인해주세요.');
+  multiWs.onerror=(e)=>{
+    setMultiStatus('⚠️ 서버 연결 오류 (게임은 계속 진행됩니다)');
+    console.warn('[WS] error:', e);
+    // 에러가 나도 게임 루프는 유지 - multiMode는 onclose에서만 해제
+  };
   multiWs.onclose=()=>{
     if(multiMode){
-      setMultiStatus('⚠️ 연결 끊김 - 재연결 시도 중...');
-      // 3초 후 자동 재연결
-      setTimeout(()=>{
-        if(!multiMode||!currentServerUrl) return;
-        connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
-      }, 3000);
+      setMultiStatus('⚠️ 연결 끊김');
+      // 게임 중이면 로컬 싱글플레이로 자동 전환 (멈추지 않게)
+      if(gameRunning && player && player.alive){
+        multiMode=false;
+        setMultiStatus('');
+        addLog('🔌 서버 연결 끊김 - 싱글 모드로 전환','dmg');
+        // 싱글 update 루프로 전환 (loop는 이미 돌고 있음)
+      } else {
+        // 게임 중 아니면 3초 후 재연결 시도
+        setTimeout(()=>{
+          if(currentServerUrl && !multiMode){
+            connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
+          }
+        }, 3000);
+      }
     }
   };
   multiWs.onmessage=(e)=>{
@@ -4699,7 +4717,7 @@ function renderWaitingHostArea(isHost){
       <div style="font-size:.65rem;color:#556;margin-top:4px;text-align:center;">방장만 시작할 수 있어요</div>
     `;
     document.getElementById('start-game-btn').addEventListener('click',()=>{
-      if(multiWs&&multiWs.readyState===1) multiWs.send(JSON.stringify({type:'start_game'}));
+      wsSend({type:'start_game'});
     });
   } else {
     el.innerHTML=`<div style="font-size:.82rem;color:#5a8;letter-spacing:1px;">⏳ 방장이 게임을 시작할 때까지 대기 중...</div>`;
@@ -4721,7 +4739,7 @@ setInterval(()=>{
   const inp=buildInput();
   if(JSON.stringify(inp)!==JSON.stringify(lastMultiInput)){
     lastMultiInput=inp;
-    multiWs.send(JSON.stringify({type:'input',input:inp}));
+    wsSend({type:'input',input:inp});
   }
 },1000/60);
 
