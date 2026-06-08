@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -350,8 +352,17 @@ canvas{display:block;cursor:none;}
   display:none;flex-direction:column;align-items:center;justify-content:center;
   font-family:'Black Han Sans',sans-serif;
 }
-#shop-screen .shop-title{font-size:1.6rem;color:#ffd700;letter-spacing:3px;margin-bottom:6px;}
-#shop-screen .shop-sub{font-size:.8rem;color:#88aacc;margin-bottom:18px;}
+#shop-screen .shop-title{font-size:1.6rem;color:#ffd700;letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 20px #ffd70088;}
+#shop-screen .shop-sub{font-size:.8rem;color:#88aacc;margin-bottom:10px;}
+.shop-tab{display:inline-block;padding:5px 14px;margin:0 4px 10px;border-radius:20px;font-size:.72rem;
+  cursor:pointer;border:1px solid #2a3050;color:#88a;background:#0d0f1e;transition:.2s;}
+.shop-tab.active{background:linear-gradient(135deg,#1a3a6a,#0a2040);color:#ffd700;border-color:#ffd70066;}
+.shop-item-new{width:140px;background:#0b0d1e;border:1.5px solid #2a2d50;border-radius:12px;
+  padding:12px 10px;text-align:center;transition:.2s;position:relative;}
+.shop-item-new:hover:not(.cant-afford){border-color:#ffd700;background:#16182e;transform:translateY(-2px);}
+.shop-item-new.cant-afford{opacity:.4;cursor:not-allowed;}
+.shop-item-new .tier-badge{position:absolute;top:6px;right:6px;font-size:.55rem;padding:1px 5px;
+  border-radius:8px;font-weight:bold;}
 #shop-gold-display{font-size:1.1rem;color:#ffd700;background:#12141f;
   border:1px solid #ffd70055;border-radius:8px;padding:6px 20px;margin-bottom:16px;}
 #shop-items{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;
@@ -1511,6 +1522,8 @@ function initGame(keepStage=false){
     const nn=window.playerNickname||'용사';
     const el=document.getElementById('player-hud-name');
     if(el) el.textContent=nn;
+  // 재생 반지 효과
+  if(window._regenActive && keepStage){ player.hp=Math.min(player.maxHp, player.hp+10); }
   startBGM(); setBGMStage(stage); addMuteButton();
   updateWeaponHUD();
   if(isMobile&&!mobileActive) initMobileControls();
@@ -2310,11 +2323,70 @@ function update(){
         :entries.map(([t,n])=>`<div class="it-row">${ITEM_EMOJI[t]} x${n}</div>`).join('');
     }
   }
+  // ── 보스 2페이즈 처리 ──────────────────────────
+  if(bossSpawned && boss && boss.alive){
+    const cfg=MTYPE[boss.type];
+    if(cfg){
+      const hpRatio=boss.hp/boss.maxHp;
+      // 2페이즈 전환
+      if(cfg.phase2Hp && hpRatio<=cfg.phase2Hp && !boss._phase2){
+        boss._phase2=true;
+        boss.attackStyle=cfg.phase2Style||boss.attackStyle;
+        boss.col=cfg.phase2Col||boss.col;
+        boss.spd=(boss.spd||1)*(cfg.phase2SpdMul||1.5);
+        boss.cd=Math.max(80,(boss.cd||120)*0.7);
+        addLog(`💀 ${cfg.label} - 분노 상태!`,'boss');
+        screenShake=30; spawnParticles(boss.x,boss.y,boss.col,30);
+        if(cfg.summonCount){
+          for(let s=0;s<cfg.summonCount;s++){
+            const ang=s/cfg.summonCount*Math.PI*2;
+            const st=cfg.summonType||'zombie';
+            const sc=MTYPE[st];
+            if(sc) monsters.push({
+              id:nextId++,type:st,x:boss.x+Math.cos(ang)*80,y:boss.y+Math.sin(ang)*80,
+              hp:sc.hp,maxHp:sc.hp,atk:sc.atk,spd:sc.spd,
+              range:sc.range||80,warn:sc.warn||120,cd:sc.cd||120,cdMax:sc.cd||120,
+              size:sc.size||16,score:0,col:sc.col||'#888',
+              attackStyle:sc.attackStyle||'fill_circle',
+              alive:true,phase:0,warnPhase:false,aimAngle:0,attackCd:60,
+            });
+          }
+          addLog(`👥 분신 ${cfg.summonCount}체 소환!`,'boss');
+        }
+      }
+      // 3페이즈 (boss5)
+      if(cfg.phase3Hp && hpRatio<=cfg.phase3Hp && !boss._phase3){
+        boss._phase3=true;
+        boss.attackStyle=cfg.phase3Style||boss.attackStyle;
+        boss.col=cfg.phase3Col||boss.col;
+        boss.spd=(boss.spd||1)*(cfg.phase3SpdMul||1.5);
+        boss.cd=Math.max(60,(boss.cd||120)*0.6);
+        addLog(`💀 ${cfg.label} - 최후의 분노!`,'boss');
+        screenShake=50;
+        for(let i=0;i<4;i++) spawnParticles(boss.x,boss.y,boss.col,12);
+      }
+      // 빙결 장판 (boss3)
+      if(cfg.iceZone && tick%200===0){
+        dangerZonesFx.push({x:boss.x,y:boss.y,r:120,life:150,col:'#0af',type:'ice'});
+        addLog('❄️ 빙결 장판!','boss');
+      }
+      // 연쇄 낙뢰 (boss4) - 2페이즈 이후
+      if(cfg.chainLightning && boss._phase2 && tick%100===0 && player && player.alive){
+        dangerZonesFx.push({x:player.x,y:player.y,r:55,life:45,col:'#ff4',type:'thunder'});
+        if(player.iframes<=0){ player.hp-=18; player.iframes=25; spawnParticles(player.x,player.y,'#ff4',8); }
+      }
+    }
+  }
+
   if(boss && player.alive && gameRunning){
     document.getElementById('boss-bar').style.display='block';
     document.getElementById('boss-hp-fill').style.width=(boss.hp/boss.maxHp*100)+'%';
-    document.getElementById('boss-title').textContent=
-      (boss.enraged?'🔥 ':'👑 ')+(boss.label||'던전의 군주')+(boss.enraged?' [격노]':'');
+    const phase=boss._phase3?'💀 [최후]':boss._phase2?'🔥 [격노]':'👑 ';
+    document.getElementById('boss-title').textContent=phase+(boss.label||'던전의 군주');
+    document.getElementById('boss-hp-fill').style.background=
+      boss._phase3?'linear-gradient(90deg,#800,#f00,#f80)':
+      boss._phase2?'linear-gradient(90deg,#a00,#f40,#fa0)':
+      'linear-gradient(90deg,#c00,#f40,#f80)';
   } else {
     document.getElementById('boss-bar').style.display='none';
   }
@@ -2338,7 +2410,15 @@ function updateFog(){
 //  렌더
 // ═══════════════════════════════════════════════════════
 // 타일 색상
-const floorColor='#111228', wallColor='#1e2040', wallTop='#252848';
+// 스테이지별 맵 테마
+const MAP_THEMES=[
+  {floor:'#111228',wall:'#1e2040',wallTop:'#252848',wallAcc:'#2a305a',boss:'#1e0808',bg:'#050810',name:'던전'},      // 1: 클래식 던전 (청색)
+  {floor:'#1a0820',wall:'#2a0835',wallTop:'#380a45',wallAcc:'#4a1060',boss:'#200010',bg:'#080510',name:'암흑 미로'}, // 2: 암흑 (보라)
+  {floor:'#081818',wall:'#0d2828',wallTop:'#103535',wallAcc:'#155050',boss:'#081a20',bg:'#050a08',name:'빙하 동굴'}, // 3: 빙하 (청록)
+  {floor:'#181808',wall:'#282808',wallTop:'#353510',wallAcc:'#504810',boss:'#1a1800',bg:'#080808',name:'사막 유적'}, // 4: 황토 (노랑)
+  {floor:'#200808',wall:'#350a0a',wallTop:'#450c0c',wallAcc:'#600808',boss:'#250000',bg:'#0a0500',name:'마왕 성채'}, // 5: 화염 (빨강)
+];
+function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
 const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
 // ── 타일맵 오프스크린 캐시 ──────────────────────────
@@ -2354,7 +2434,7 @@ function _rebuildTileCache(){
     _tileCtx=_tileCanvas.getContext('2d');
   }
   const tc=_tileCtx, ts=TILE;
-  tc.fillStyle='#050810'; tc.fillRect(0,0,MAP_W,MAP_H);
+  const th=getTheme(); tc.fillStyle=th.bg; tc.fillRect(0,0,MAP_W,MAP_H);
   for(let r=0;r<ROWS;r++){
     for(let c=0;c<COLS;c++){
       const idx=r*COLS+c;
@@ -2364,12 +2444,12 @@ function _rebuildTileCache(){
       const inBoss=bossArena&&wx>=bossArena.x-ts&&wx<bossArena.x+bossArena.w+ts
                 &&wy>=bossArena.y-ts&&wy<bossArena.y+bossArena.h+ts;
       if(t===1){
-        tc.fillStyle=wallColor;  tc.fillRect(wx,wy,ts,ts);
-        tc.fillStyle=wallTop;    tc.fillRect(wx+2,wy+2,ts-4,ts-4);
-        tc.fillStyle='#2a305a';  tc.fillRect(wx+2,wy+2,ts-4,3);
-        tc.fillStyle='#2a305a';  tc.fillRect(wx+2,wy+2,3,ts-4);
+        tc.fillStyle=th.wall;    tc.fillRect(wx,wy,ts,ts);
+        tc.fillStyle=th.wallTop; tc.fillRect(wx+2,wy+2,ts-4,ts-4);
+        tc.fillStyle=th.wallAcc; tc.fillRect(wx+2,wy+2,ts-4,3);
+        tc.fillStyle=th.wallAcc; tc.fillRect(wx+2,wy+2,3,ts-4);
       } else {
-        tc.fillStyle=inBoss?bossFloor:floorColor; tc.fillRect(wx,wy,ts,ts);
+        tc.fillStyle=inBoss?th.boss:th.floor; tc.fillRect(wx,wy,ts,ts);
         tc.strokeStyle=inBoss?'#2a1010':'#151530';
         tc.lineWidth=.5; tc.strokeRect(wx,wy,ts,ts);
       }
@@ -2398,7 +2478,7 @@ const _origUpdateFog=()=>{
 
 function draw(){
   // 멀티: player가 없으면 대기
-  if(multiMode && (!player||!player.alive&&!multiState)) return;
+  if(multiMode && !multiState && !player) return;
   if(!multiMode && !gameRunning) return;
   if(!player) return;
 
@@ -2409,7 +2489,8 @@ function draw(){
   ctx.save();
   ctx.translate(shX,shY);
   ctx.clearRect(-10,-10,W+20,H+20);
-  ctx.fillStyle='#050810'; ctx.fillRect(-10,-10,W+20,H+20);
+  // 스테이지별 배경색
+  ctx.fillStyle=getTheme().bg; ctx.fillRect(-10,-10,W+20,H+20);
 
   // ── 타일 렌더링 (탐험 여부 + 시야 여부 2단계) ──────
   const px=player.x, py=player.y, sr2=SIGHT_R*SIGHT_R;
@@ -4018,7 +4099,7 @@ function drawMinimap(){
     for(let r=0;r<ROWS;r++){
       for(let c=0;c<COLS;c++){
         if(!explored[r*COLS+c]) continue;
-        _mmCtx2.fillStyle=tiles[r*COLS+c]===1?'#2a2d50':'#191c36';
+        const _th=getTheme(); _mmCtx2.fillStyle=tiles[r*COLS+c]===1?_th.wall:_th.floor;
         _mmCtx2.fillRect(c*TILE*scX|0,r*TILE*scY|0,Math.ceil(TILE*scX+.5),Math.ceil(TILE*scY+.5));
       }
     }
@@ -4358,9 +4439,27 @@ function connectMultiWs(url, joinMsg){
   multiWs.onopen=()=>{
     setMultiStatus('연결됨! 방 입장 중...');
     multiWs.send(JSON.stringify(joinMsg));
+    // heartbeat - 30초마다 ping 전송으로 연결 유지
+    if(window._heartbeatId) clearInterval(window._heartbeatId);
+    window._heartbeatId=setInterval(()=>{
+      if(multiWs&&multiWs.readyState===1){
+        try{ multiWs.send(JSON.stringify({type:'ping'})); }catch(e){}
+      } else {
+        clearInterval(window._heartbeatId);
+      }
+    }, 25000);
   };
   multiWs.onerror=()=>setMultiStatus('❌ 연결 실패. URL을 확인해주세요.');
-  multiWs.onclose=()=>{ if(multiMode) setMultiStatus('연결 끊김'); multiMode=false; };
+  multiWs.onclose=()=>{
+    if(multiMode){
+      setMultiStatus('⚠️ 연결 끊김 - 재연결 시도 중...');
+      // 3초 후 자동 재연결
+      setTimeout(()=>{
+        if(!multiMode||!currentServerUrl) return;
+        connectMultiWs(currentServerUrl, {type:'join_room', roomId:window._lastRoomId||'', name:window.playerNickname||'용사'});
+      }, 3000);
+    }
+  };
   multiWs.onmessage=(e)=>{
     const msg=JSON.parse(e.data);
 
@@ -4478,6 +4577,12 @@ function connectMultiWs(url, joinMsg){
         player.shieldActive=me.shieldActive||0;
         player.facing=me.facing||0;
         if(!player.charId) player.charId=me.charId||(window._charIdMap&&window._charIdMap[me.id])||selectedChar||'photo0';
+        // 무기 동기화 (서버에서 무기 정보 오면 반영)
+        if(me.weapon && WEAPONS[me.weapon]) player.weapon=me.weapon;
+        window._lastMe=me; // 마지막 상태 저장
+      } else if(window._lastMe && player){
+        // me를 못찾아도 마지막 알려진 상태 유지 (순간 사라짐 방지)
+        player.alive=player.alive; // 상태 유지
       }
 
       // 몬스터 전역변수 주입 (싱글 draw가 그대로 렌더)
@@ -4757,53 +4862,41 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 // ═══════════════════════════════════════════════════════
 // 스테이지별 상점 아이템 풀
 function getShopItems(stg){
-  const base=[
-    { id:'hp30',    name:'소형 포션',  emoji:'🧪', desc:'HP +30',           cost:15,  type:'consumable' },
-    { id:'hp60',    name:'대형 포션',  emoji:'❤️', desc:'HP +60',           cost:28,  type:'consumable' },
-    { id:'maxhp',   name:'체력 강화',  emoji:'💪', desc:'최대 HP +20',       cost:50,  type:'upgrade'    },
-    { id:'bomb',    name:'폭탄 충전',  emoji:'💣', desc:'폭탄 쿨 초기화',    cost:20,  type:'consumable' },
-    { id:'shield',  name:'방패 충전',  emoji:'🛡', desc:'방패 쿨 초기화',    cost:20,  type:'consumable' },
-    { id:'thunder', name:'번개 충전',  emoji:'⚡', desc:'번개 쿨 초기화',    cost:20,  type:'consumable' },
-    { id:'speed2',  name:'부스트',     emoji:'👟', desc:'속도 +30초',        cost:25,  type:'consumable' },
-  ];
-  const stage2plus=[
-    { id:'weapon_pistol',  name:'권총',      emoji:'🔫', desc:'빠른 단발',  cost:40, type:'weapon' },
-    { id:'weapon_shotgun', name:'산탄총',    emoji:'💥', desc:'5발 산탄',   cost:55, type:'weapon' },
-    { id:'weapon_smg',     name:'기관단총',  emoji:'⚡', desc:'고속 연사',  cost:60, type:'weapon' },
-  ];
-  const stage3plus=[
-    { id:'weapon_rifle',   name:'저격총',    emoji:'🎯', desc:'관통·고뎀',  cost:80,  type:'weapon' },
-    { id:'weapon_laser',   name:'레이저',    emoji:'🔴', desc:'관통 레이저', cost:85, type:'weapon' },
-    { id:'cd_reduce',      name:'쿨다운 감소',emoji:'⏱',desc:'스킬CD -20%',cost:70, type:'upgrade' },
-  ];
-  const stage4plus=[
-    { id:'weapon_cannon',  name:'캐논',      emoji:'💣', desc:'초고데미지',  cost:100, type:'weapon' },
-    { id:'weapon_twin',    name:'쌍권총',    emoji:'🔫', desc:'2발 동시',    cost:90,  type:'weapon' },
-    { id:'atk_up',         name:'공격력 강화',emoji:'⚔', desc:'ATK +10',    cost:80,  type:'upgrade' },
-  ];
-  let pool=[...base];
-  if(stg>=2) pool=[...pool,...stage2plus];
-  if(stg>=3) pool=[...pool,...stage3plus];
-  if(stg>=4) pool=[...pool,...stage4plus];
-  // 랜덤 6~8개 선택
-  const shuffled=pool.sort(()=>Math.random()-.5);
-  return shuffled.slice(0,Math.min(8,shuffled.length));
+  // tier 제한: 스테이지에 따라 등급 아이템 해금
+  const maxTier = stg>=4?4 : stg>=3?3 : stg>=2?2 : 1;
+  const pool = SHOP_ITEMS.filter(i=>(i.tier||1)<=maxTier);
+  // 카테고리별 균형 있게 선택 (무기 2~3, 강화 2~3, 소비 3~4)
+  const weapons   = pool.filter(i=>i.type==='weapon').sort(()=>Math.random()-.5).slice(0,3);
+  const upgrades  = pool.filter(i=>i.type==='upgrade').sort(()=>Math.random()-.5).slice(0,3);
+  const consumables=pool.filter(i=>i.type==='consumable').sort(()=>Math.random()-.5).slice(0,4);
+  return [...consumables,...upgrades,...weapons];
 }
 const SHOP_ITEMS = [
-  { id:'hp30',    name:'소형 포션',    emoji:'🧪', desc:'HP +30 회복',      cost:15,  type:'consumable' },
-  { id:'hp60',    name:'대형 포션',    emoji:'❤️', desc:'HP +60 회복',      cost:28,  type:'consumable' },
-  { id:'maxhp',   name:'체력 강화',    emoji:'💪', desc:'최대 HP +20',       cost:50,  type:'upgrade'    },
-  { id:'bomb',    name:'폭탄 충전',    emoji:'💣', desc:'폭탄 쿨 초기화',   cost:20,  type:'consumable' },
-  { id:'shield',  name:'방패 충전',    emoji:'🛡', desc:'방패 쿨 초기화',   cost:20,  type:'consumable' },
-  { id:'thunder', name:'번개 충전',    emoji:'⚡', desc:'번개 쿨 초기화',   cost:20,  type:'consumable' },
-  { id:'pistol',  name:'권총',         emoji:'🔫', desc:'빠른 단발 권총',    cost:30,  type:'weapon', wid:'pistol'  },
-  { id:'shotgun', name:'산탄총',       emoji:'💥', desc:'5발 산탄',          cost:45,  type:'weapon', wid:'shotgun' },
-  { id:'rifle',   name:'저격 소총',    emoji:'🎯', desc:'관통 고데미지',     cost:60,  type:'weapon', wid:'rifle'   },
-  { id:'smg',     name:'기관단총',     emoji:'⚡', desc:'초고속 연사',        cost:50,  type:'weapon', wid:'smg'     },
-  { id:'laser',   name:'레이저',       emoji:'🔴', desc:'고속 관통',          cost:70,  type:'weapon', wid:'laser'   },
-  { id:'cannon',  name:'캐논',         emoji:'💣', desc:'초고데미지 단발',    cost:80,  type:'weapon', wid:'cannon'  },
-  { id:'twin',    name:'쌍권총',       emoji:'🔫', desc:'2발 동시 발사',      cost:55,  type:'weapon', wid:'twin'    },
-  { id:'speed2',  name:'스피드 업',    emoji:'👟', desc:'속도 부스트 +3초',  cost:25,  type:'consumable' },
+  // 소비 아이템
+  { id:'hp30',      name:'소형 포션',    emoji:'🧪', desc:'HP +30 회복',       cost:15,  type:'consumable', tier:1 },
+  { id:'hp60',      name:'대형 포션',    emoji:'❤️', desc:'HP +60 회복',       cost:28,  type:'consumable', tier:1 },
+  { id:'hp_full',   name:'회복 포션',    emoji:'💊', desc:'HP 완전 회복',       cost:80,  type:'consumable', tier:3 },
+  { id:'bomb',      name:'폭탄 충전',    emoji:'💣', desc:'폭탄 쿨 초기화',    cost:20,  type:'consumable', tier:1 },
+  { id:'shield',    name:'방패 충전',    emoji:'🛡', desc:'방패 쿨 초기화',    cost:20,  type:'consumable', tier:1 },
+  { id:'thunder',   name:'번개 충전',    emoji:'⚡', desc:'번개 쿨 초기화',    cost:20,  type:'consumable', tier:1 },
+  { id:'speed2',    name:'스피드 업',    emoji:'👟', desc:'속도 부스트 +3초',  cost:25,  type:'consumable', tier:1 },
+  { id:'allskill',  name:'전 스킬 충전', emoji:'✨', desc:'모든 스킬 쿨 초기화',cost:55, type:'consumable', tier:2 },
+  // 영구 강화
+  { id:'maxhp',     name:'체력 강화',    emoji:'💪', desc:'최대 HP +20',        cost:50,  type:'upgrade', tier:1 },
+  { id:'maxhp2',    name:'체력 강화 II', emoji:'❤️‍🔥',desc:'최대 HP +40',      cost:90,  type:'upgrade', tier:3 },
+  { id:'atk_up',    name:'공격력 강화',  emoji:'⚔️', desc:'공격력 +10',         cost:70,  type:'upgrade', tier:2 },
+  { id:'atk_up2',   name:'공격력 강화II',emoji:'🗡️', desc:'공격력 +20',         cost:120, type:'upgrade', tier:4 },
+  { id:'cd_reduce', name:'쿨다운 감소',  emoji:'⏱️', desc:'스킬 CD -25%',       cost:80,  type:'upgrade', tier:3 },
+  { id:'pierce_up', name:'관통 강화',    emoji:'🏹', desc:'모든 총알 관통+1',   cost:100, type:'upgrade', tier:3 },
+  { id:'regen',     name:'재생 반지',    emoji:'💍', desc:'매 스테이지 HP+10 자동회복', cost:90, type:'upgrade', tier:2 },
+  // 무기
+  { id:'pistol',    name:'권총',         emoji:'🔫', desc:'빠른 단발',          cost:35,  type:'weapon', wid:'pistol',  tier:1 },
+  { id:'shotgun',   name:'산탄총',       emoji:'💥', desc:'5발 산탄',           cost:50,  type:'weapon', wid:'shotgun', tier:2 },
+  { id:'smg',       name:'기관단총',     emoji:'⚡', desc:'초고속 연사',         cost:60,  type:'weapon', wid:'smg',     tier:2 },
+  { id:'rifle',     name:'저격 소총',    emoji:'🎯', desc:'관통 고데미지',       cost:75,  type:'weapon', wid:'rifle',   tier:3 },
+  { id:'laser',     name:'레이저',       emoji:'🔴', desc:'고속 관통',           cost:85,  type:'weapon', wid:'laser',   tier:3 },
+  { id:'twin',      name:'쌍권총',       emoji:'🔫', desc:'2발 동시 발사',       cost:70,  type:'weapon', wid:'twin',    tier:3 },
+  { id:'cannon',    name:'캐논',         emoji:'💣', desc:'초고데미지 단발',     cost:100, type:'weapon', wid:'cannon',  tier:4 },
 ];
 
 let _shopNextStage=1;
@@ -4820,28 +4913,32 @@ function showShop(nextStage){
 
   // 스테이지별 아이템 풀
   const shopPool=getShopItems(nextStage);
-  // 현재 무기 제외, 살 수 있는 아이템 표시
+  const tierNames=['','⭐','⭐⭐','⭐⭐⭐','👑'];
+  const tierColors=['','#888','#4af','#fa0','#f44'];
   if(si) si.innerHTML=shopPool.map(item=>{
     const canAfford=gold>=item.cost;
     const isCurrentWeapon=item.type==='weapon'&&player&&player.weapon===item.wid;
-    return `<div style="background:#0b0d1e;border:1px solid ${canAfford&&!isCurrentWeapon?'#2a4050':'#1a1d30'};
-      border-radius:10px;padding:12px 14px;text-align:center;width:130px;
-      opacity:${canAfford&&!isCurrentWeapon?1:0.5};">
-      <div style="font-size:1.6rem;">${item.emoji}</div>
-      <div style="font-size:.75rem;color:#d4a832;margin:4px 0;">${item.name}</div>
+    const tier=item.tier||1;
+    const typeIcon=item.type==='weapon'?'🗡️':item.type==='upgrade'?'⬆️':'🧪';
+    return `<div class="shop-item-new ${canAfford&&!isCurrentWeapon?'':'cant-afford'}">
+      <span class="tier-badge" style="background:${tierColors[tier]}22;color:${tierColors[tier]};border:1px solid ${tierColors[tier]}44">${tierNames[tier]}</span>
+      <div style="font-size:1.8rem;margin-bottom:4px;">${item.emoji}</div>
+      <div style="font-size:.7rem;color:#88aacc;margin-bottom:2px;">${typeIcon} ${item.type==='weapon'?'무기':item.type==='upgrade'?'강화':'소비'}</div>
+      <div style="font-size:.78rem;color:#d4a832;margin:3px 0;font-weight:bold;">${item.name}</div>
       <div style="font-size:.6rem;color:#667;margin-bottom:8px;">${item.desc}</div>
-      <div style="font-size:.7rem;color:#f0c84a;margin-bottom:6px;">💰 ${item.cost}</div>
+      <div style="font-size:.75rem;color:#f0c84a;margin-bottom:6px;">💰 ${item.cost}</div>
       ${isCurrentWeapon
-        ? '<div style="font-size:.65rem;color:#4af;">장착 중</div>'
+        ? '<div style="font-size:.65rem;color:#4af;padding:4px 0;">✓ 장착 중</div>'
         : `<button onclick="buyShopItem('${item.id}')"
-            style="background:${canAfford?'linear-gradient(135deg,#2a6,#4b8)':'#333'};
-            color:${canAfford?'#fff':'#666'};border:none;border-radius:6px;
-            padding:4px 12px;font-size:.72rem;cursor:${canAfford?'pointer':'not-allowed'};">
-            구매
+            style="background:${canAfford?'linear-gradient(135deg,#1a5a3a,#2a8a5a)':'#222'};
+            color:${canAfford?'#fff':'#555'};border:none;border-radius:8px;
+            padding:5px 14px;font-size:.72rem;cursor:${canAfford?'pointer':'not-allowed'};
+            width:100%;font-weight:bold;">
+            ${canAfford?'구매':'골드 부족'}
           </button>`
       }
     </div>`;
-  }).join('')||'<div style="color:#667">구매 가능한 아이템 없음</div>';
+  }).join('')||'<div style="color:#667;padding:20px">구매 가능한 아이템 없음</div>';
 
   scr.style.display='flex';
   SFX.door&&SFX.door();
@@ -4854,15 +4951,23 @@ function buyShopItem(itemId){
   SFX.item();
 
   if(item.type==='consumable'){
-    if(item.id==='hp30'){ player.hp=Math.min(player.maxHp,player.hp+30); }
-    if(item.id==='hp60'){ player.hp=Math.min(player.maxHp,player.hp+60); }
-    if(item.id==='bomb')  skillCd.bomb=0;
-    if(item.id==='shield') skillCd.shield=0;
-    if(item.id==='thunder') skillCd.thunder=0;
-    if(item.id==='speed2') player.speedBoost=(player.speedBoost||0)+180;
+    if(item.id==='hp30')    { player.hp=Math.min(player.maxHp,player.hp+30); }
+    if(item.id==='hp60')    { player.hp=Math.min(player.maxHp,player.hp+60); }
+    if(item.id==='hp_full') { player.hp=player.maxHp; }
+    if(item.id==='bomb')    { skillCd.bomb=0; }
+    if(item.id==='shield')  { skillCd.shield=0; }
+    if(item.id==='thunder') { skillCd.thunder=0; }
+    if(item.id==='allskill'){ skillCd.bomb=0; skillCd.shield=0; skillCd.thunder=0; }
+    if(item.id==='speed2')  { player.speedBoost=(player.speedBoost||0)+180; }
     addLog(`🛒 ${item.name} 구매!`,'win');
   } else if(item.type==='upgrade'){
-    if(item.id==='maxhp'){ player.maxHp+=20; player.hp=Math.min(player.maxHp,player.hp+20); }
+    if(item.id==='maxhp')    { player.maxHp+=20; player.hp=Math.min(player.maxHp,player.hp+20); }
+    if(item.id==='maxhp2')   { player.maxHp+=40; player.hp=Math.min(player.maxHp,player.hp+40); }
+    if(item.id==='atk_up')   { window._atkBonus=(window._atkBonus||0)+10; }
+    if(item.id==='atk_up2')  { window._atkBonus=(window._atkBonus||0)+20; }
+    if(item.id==='cd_reduce'){ window._cdMul=(window._cdMul||1)*0.75; }
+    if(item.id==='pierce_up'){ window._pierceBonus=(window._pierceBonus||0)+1; }
+    if(item.id==='regen')    { window._regenActive=true; }
     addLog(`⬆️ ${item.name} 업그레이드!`,'win');
   } else if(item.type==='weapon'){
     player.weapon=item.wid;
