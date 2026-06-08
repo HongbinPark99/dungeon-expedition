@@ -19,8 +19,12 @@ body{
 #lobby{
   position:fixed;inset:0;
   background:radial-gradient(ellipse at 50% 60%, #0d1230 0%, #050810 70%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:20px;z-index:200;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;
+  gap:16px;z-index:200;
+  overflow-y:auto;
+  padding:30px 16px 40px;
+  box-sizing:border-box;
 }
 #lobby h1{
   font-family:'Black Han Sans',sans-serif;font-size:3rem;
@@ -1723,8 +1727,8 @@ function doAttack(){
 
 function doSkillBomb(){
   if(multiMode){
-    if(!multiState&&!gameRunning) return;
-    if(skillCd.bomb>0) return; // 클라이언트 쿨다운 체크
+    if(!player||!player.alive) return;
+    if(skillCd.bomb>0) return;
     skillCd.bomb=CD_BOMB;      // 즉시 쿨다운 적용
     if(multiWs&&multiWs.readyState===1)
       multiWs.send(JSON.stringify({type:'bomb'}));
@@ -1754,6 +1758,7 @@ function doSkillBomb(){
 
 function doSkillShield(){
   if(multiMode){
+    if(!player||!player.alive) return;
     if(skillCd.shield>0) return;
     skillCd.shield=CD_SHIELD;
     shieldActive=120;
@@ -1771,6 +1776,7 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
+    if(!player||!player.alive) return;
     if(skillCd.thunder>0) return;
     skillCd.thunder=CD_THUNDER;
     if(multiWs&&multiWs.readyState===1)
@@ -4126,6 +4132,7 @@ function updateMultiClient(){
       if(it.life<=0) return;
       if(Math.hypot(it.x-player.x,it.y-player.y)<22){
         it.life=0;
+        if(it.id) _pickedItemIds.add(it.id); // 픽업 ID 기록
         try{SFX.item();}catch(e){}
         if(it.type==='hp'){
           player.hp=Math.min(player.maxHp,player.hp+30);
@@ -4146,7 +4153,7 @@ function updateMultiClient(){
         }
       }
     });
-    items=items.filter(it=>it.life>0);
+    items=items.filter(it=>it.life>0 && !_pickedItemIds.has(it.id));
   }
 
   // ── 파티클 ────────────────────────────────────────
@@ -4219,6 +4226,7 @@ document.getElementById('game').addEventListener('click',()=>canvas.focus());
 let multiMode=false, multiWs=null, currentServerUrl='';
 let multiState=null;
 let myMultiId=null, myColorIdx=0;
+const _pickedItemIds=new Set(); // 이미 픽업한 아이템 ID 추적
 
 function setMultiStatus(msg){ document.getElementById('multi-status').textContent=msg; }
 function getNickname(){ return (document.getElementById('nickname-input').value.trim())||'용사'; }
@@ -4384,6 +4392,9 @@ function connectMultiWs(url, joinMsg){
       bullets       = [];
       bombs         = [];
       items         = [];
+      _pickedItemIds.clear();
+      skillCd.bomb=0; skillCd.shield=0; skillCd.thunder=0;
+      shieldActive=0;
       // camX, camY는 첫 state에서 점프하므로 리셋 안 함
       tick=0;
       window._fog2=null; window._fog2C=null;
@@ -4446,7 +4457,10 @@ function connectMultiWs(url, joinMsg){
       }
 
       // 아이템 전역변수 주입
-      if(msg.items) items=(msg.items||[]).map(it=>({...it,pulse:it.pulse||0,life:600}));
+      // 픽업한 아이템 제외하고 주입
+      if(msg.items) items=(msg.items||[])
+        .filter(it=>!_pickedItemIds.has(it.id))
+        .map(it=>({...it,pulse:it.pulse||0,life:600}));
 
       // 총알 렌더용 주입 (판정은 서버)
       if(msg.bullets) bullets=(msg.bullets||[]).map(b=>({
