@@ -3,6 +3,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<!-- v1780916921 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>던전 원정대</title>
 <style>
@@ -555,6 +558,35 @@ canvas{display:block;cursor:none;}
 
 <script>
 'use strict';
+// ── 전역 변수 최상단 선언 (hoisting 보장) ──────────
+var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
+var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
+var _exploredVersion=0, _lastExploredVersion=-1;
+var rafId=null, lastT=0, accumT=0;
+var mouseAttacking=false, nextId=1;
+var _audioCtx=null, _sfxMuted=false, _bgmGain=null, _bgmOscs=[];
+var isMobile=('ontouchstart' in window)||(navigator.maxTouchPoints>0);
+var mobileActive=false, aimFireInterval=null;
+var selectedChar='photo0';
+var multiMode=false, multiWs=null, multiState=null;
+var myMultiId=null, myColorIdx=0, currentServerUrl='';
+var gameRunning=false, gameWon=false, gameOver=false;
+var player=null, monsters=[], particles=[], attackFx=[];
+var camX=0, camY=0, kills=0, tick=0, gold=0;
+var bullets=[], bombs=[], dangerZonesFx=[], items=[];
+var skillCd={bomb:0,shield:0,thunder:0}, shieldActive=0;
+var bossArena=null, bossSpawned=false, bossDefeated=false;
+var screenShake=0, spawnTimer=0, logEntries=[];
+var _shopNextStage=1, alertTimer=0;
+var _pickedItemIds=new Set();
+// ────────────────────────────────────────────────────
+// ── 전역 변수 (TDZ 방지 - 스크립트 최상단 선언) ──
+// (above vars declared at top)
+// rafId declared at top
+// lastT/accumT declared at top
+var mouseAttacking=false;
+var nextId=1;
+var _pickedItemIds=new Set();
 // ═══════════════════════════════════════════════════════
 //  상수
 // ═══════════════════════════════════════════════════════
@@ -2291,9 +2323,7 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
-var _tileCanvas=null, _tileCtx=null, _tilesDirty=true;
-var _mmCanvas=null, _mmCtx2=null, _mmDirty=true;
-var _exploredVersion=0, _lastExploredVersion=-1;
+// (above vars declared at top)
 
 function _rebuildTileCache(){
   if(!_tileCanvas||_tileCanvas.width!==MAP_W||_tileCanvas.height!==MAP_H){
