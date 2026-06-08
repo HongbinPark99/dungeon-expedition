@@ -1869,7 +1869,8 @@ function spawnParticles(x,y,col,n=6){
 //  업데이트
 // ═══════════════════════════════════════════════════════
 function update(){
-  if(!gameRunning) return;
+  // 멀티모드도 update() 실행 (서버 처리 부분만 스킵)
+  if(!gameRunning && !multiMode) return;
   tick++;
 
   // ── 플레이어 이동 ─────────────────────────────────
@@ -1932,8 +1933,8 @@ function update(){
     }
   }
 
-  // ── 몬스터 AI ────────────────────────────────────
-  monsters.forEach(m=>{
+  // ── 몬스터 AI (서버 처리 → 멀티에서 스킵) ───────
+  if(!multiMode) monsters.forEach(m=>{
     if(!m.alive) return;
     m.phase++;
     const dx=player.x-m.x, dy=player.y-m.y;
@@ -2054,8 +2055,8 @@ function update(){
     }
   });
 
-  // ── 몬스터 리스폰 (절대 상한 30) ─────────────────
-  spawnTimer++;
+  // ── 몬스터 리스폰 (절대 상한 30, 멀티에서 스킵) ──
+  if(!multiMode){ spawnTimer++;
   if(spawnTimer>Math.max(150,280-(stage-1)*15)){
     spawnTimer=0;
     const normal=monsters.filter(m=>m.alive&&m.type!=='boss').length;
@@ -2078,6 +2079,12 @@ function update(){
     if(!player.alive) return;
     if(Math.hypot(it.x-player.x,it.y-player.y)<22){
       it.life=0;
+      if(multiMode && it.id){
+        _pickedItemIds.add(it.id);
+        // 서버에 픽업 알림 (서버가 items에서 제거)
+        if(multiWs&&multiWs.readyState===1)
+          multiWs.send(JSON.stringify({type:'pickup',itemId:it.id}));
+      }
       SFX.item();
       if(it.type==='hp'){
         player.hp=Math.min(player.maxHp,player.hp+30);
@@ -4113,6 +4120,7 @@ function updateMultiClient(){
     player.dashVx*=0.88;
     player.dashVy*=0.88;
   }
+  } // end if(!multiMode) respawn
 
   // ── 쿨다운 감소 (싱글과 동일) ─────────────────────
   if(player.dashCd>0)     player.dashCd--;
@@ -4187,8 +4195,8 @@ function loop(t=0){
   lastT=t;
 
   if(multiMode){
-    // 멀티: 서버가 게임 로직 처리, 클라이언트는 렌더+카메라+입력만
-    updateMultiClient(); // 카메라·dash 물리·fog 등 클라이언트 처리
+    // 멀티: update()에서 서버 처리 부분만 스킵하고 나머지는 싱글과 동일
+    update();
     draw();
     multiDrawPlayers();
     return;
