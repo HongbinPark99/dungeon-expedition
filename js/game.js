@@ -11,8 +11,6 @@ function initGame(keepStage=false){
   tick         = 0;
   if(!keepStage){ gold=0; window._atkBonus=0; }
   spawnTimer   = 0;
-  // 보스를 보스 방에 미리 배치
-  if(bossArena) spawnBoss();
   logEntries   = [];
   screenShake  = 0;
   particles    = [];
@@ -47,6 +45,8 @@ function initGame(keepStage=false){
   // 초기 몬스터 (스테이지 올라갈수록 더 많이)
   const initCount = 28 + (stage-1)*8;
   for(let i=0;i<initCount;i++) spawnMonster();
+  // 보스를 보스 방 중앙에 미리 배치 (비활성 상태 - 방 진입 시 활성화)
+  if(bossArena) spawnBoss();
 
   // 캐릭터/닉네임 (최초 스테이지만)
   if(stage===1){
