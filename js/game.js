@@ -267,7 +267,7 @@ function doDash(){
     player.dashFrames=DASH_FRAMES;
     player.dashCd=DASH_CD;
     player.iframes=DASH_IFRAMES;
-    wsSend({type:'dash'});
+    wsSend({type:'dash', angle:ang});  // angle 포함
     try{SFX.dash();}catch(e){}
     return;
   }
