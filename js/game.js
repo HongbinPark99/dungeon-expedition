@@ -457,7 +457,8 @@ function spawnParticles(x,y,col,n=6){
 //  업데이트
 // ═══════════════════════════════════════════════════════
 function update(){
-  if(!gameRunning) return;
+  if(!gameRunning && !multiMode) return;
+  if(multiMode && !player) return;
   tick++;
 
   // ── 플레이어 이동 ─────────────────────────────────
@@ -472,8 +473,8 @@ function update(){
         (mouse.x+camX)-player.x
       );
     }
-    // 마우스 홀드 연사
-    if(mouseAttacking) doAttack();
+    // 마우스 홀드 연사 (싱글만)
+    if(!multiMode && mouseAttacking) doAttack();
 
     let dx=0,dy=0;
     if(keys['ArrowUp']   ||keys['w']||keys['W']) dy-=1;
@@ -509,6 +510,16 @@ function update(){
     }
     // 대시 쿨다운
     if(player.dashCd>0) player.dashCd--;
+    // 멀티: 입력 상태를 서버에 전송
+    if(multiMode && tick%2===0){
+      wsSend({type:'input', input:{
+        up:!!(keys['ArrowUp']||keys['w']||keys['W']),
+        down:!!(keys['ArrowDown']||keys['s']||keys['S']),
+        left:!!(keys['ArrowLeft']||keys['a']||keys['A']),
+        right:!!(keys['ArrowRight']||keys['d']||keys['D']),
+        mouseAngle: player.facing,
+      }});
+    }
 
     // 보스 방 진입
     if(!bossSpawned){
@@ -530,8 +541,9 @@ function update(){
     }
   }
 
-  // ── 몬스터 AI ────────────────────────────────────
+  // ── 몬스터 AI (싱글: 직접처리 / 멀티: 서버처리) ──
   monsters.forEach(m=>{
+    if(multiMode) return;  // 멀티는 서버가 처리
     if(!m.alive) return;
     m.phase++;
     const dx=player.x-m.x, dy=player.y-m.y;
@@ -651,8 +663,8 @@ function update(){
     }
   });
 
-  // ── 몬스터 리스폰 (절대 상한 30) ─────────────────
-  spawnTimer++;
+  // ── 몬스터 리스폰 (싱글만) ──────────────────────
+  if(!multiMode){ spawnTimer++;
   if(spawnTimer>Math.max(150,280-(stage-1)*15)){
     spawnTimer=0;
     const normal=monsters.filter(m=>m.alive&&m.type!=='boss').length;
@@ -661,7 +673,7 @@ function update(){
   }
   let mfi=0;
   for(let i=0;i<monsters.length;i++){if(monsters[i].alive)monsters[mfi++]=monsters[i];}
-  monsters.length=mfi;
+  monsters.length=mfi; }
 
   // ── 쿨다운 감소 ──────────────────────────────────
   if(skillCd.bomb>0)    skillCd.bomb--;
@@ -669,14 +681,17 @@ function update(){
   if(skillCd.thunder>0) skillCd.thunder--;
   if(shieldActive>0)    shieldActive--;
 
-  // ── 아이템 픽업 (싱글 전용) ──────────────────────
-  if(!multiMode){
+  // ── 아이템 픽업 (싱글/멀티 공통) ─────────────────
+  if(!window._pickedItems) window._pickedItems=new Set();
+  {
     items.forEach(it=>{
       it.life--; it.pulse++;
       if(!player.alive) return;
-      if(Math.hypot(it.x-player.x,it.y-player.y)<22){
+      if(Math.hypot(it.x-player.x,it.y-player.y)<22 && !window._pickedItems.has(it.id)){
+        window._pickedItems.add(it.id);
         it.life=0;
         try{SFX.item();}catch(e){}
+        if(multiMode) wsSend({type:'pickup', itemId:it.id});
         if(it.type==='hp'){
           player.hp=Math.min(player.maxHp,player.hp+30);
           const hn=document.getElementById('hn0');
@@ -714,8 +729,8 @@ function update(){
   }
   if(player.speedBoost>0) player.speedBoost--;
 
-  // ── 폭탄 업데이트 ────────────────────────────────
-  bombs.forEach(b=>{
+  // ── 폭탄/총알 (싱글만 - 멀티는 서버처리) ────────
+  if(!multiMode){ bombs.forEach(b=>{
     if(b.exploded){
       b.explodeTimer++;
       b.radius=b.maxRadius*(b.explodeTimer/20);
@@ -786,7 +801,7 @@ function update(){
   if(bullets.length>80)bullets.splice(0,bullets.length-80);
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
-  bullets.length=bi;
+  bullets.length=bi; } // end if(!multiMode) 폭탄/총알
 
   // ── 파티클 ───────────────────────────────────────
   let pi=0;
