@@ -271,10 +271,16 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        // 위치: 서버 state 그대로 따름 (서버가 대시 물리 처리)
-        player.x=me.x; player.y=me.y;
-        // dashFrames도 서버값 반영
-        player.dashFrames=me.dashFrames||0;
+        // 위치: 대시 중이면 로컬 물리 유지, 아니면 서버 값 따름
+        if(player.dashFrames>0){
+          // 대시 중 - 로컬 dashVx/dashVy 물리 계속 실행
+          player._skipSnap=(player._skipSnap||0)+1;
+        } else {
+          player.x=me.x; player.y=me.y;
+          player._skipSnap=0;
+        }
+        // dashFrames는 서버값 우선 (서버가 대시 종료 판단)
+        if(me.dashFrames!==undefined) player.dashFrames=me.dashFrames;
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         // iframes/dashCd는 로컬 값 유지 (서버 덮어쓰기 방지)
