@@ -11,6 +11,8 @@ function initGame(keepStage=false){
   tick         = 0;
   if(!keepStage){ gold=0; window._atkBonus=0; }
   spawnTimer   = 0;
+  // 보스를 보스 방에 미리 배치
+  if(bossArena) spawnBoss();
   logEntries   = [];
   screenShake  = 0;
   particles    = [];
@@ -210,11 +212,11 @@ function spawnMonster(type){
 }
 
 function spawnBoss(){
+  // 보스를 보스 방 중앙에 미리 배치 (bossSpawned=false, 비활성 상태)
   const bossType=getBossType(stage);
   const cfg=MTYPE[bossType];
   const bx=bossArena.x+bossArena.w/2;
   const by=bossArena.y+bossArena.h/2;
-  // 보스는 스테이지마다 자체 스탯이 다르므로 boost를 작게
   const boost=1+(stage-1)*0.15;
   monsters.push({
     id:nextId++, type:bossType, x:bx, y:by,
@@ -229,31 +231,24 @@ function spawnBoss(){
     size:  cfg.size+Math.min(stage-1,5),
     score: (cfg.score*stage)|0,
     col:   cfg.col,
-    // 보스 패턴 랜덤 (매 스폰마다 다름)
     attackStyle: ['fill_cross','fill_scatter','fill_ring','fill_cone','fill_line'][Math.random()*5|0],
     attackCd:80, warnPhase:false, alive:true,
     enraged:false, phase:0,
     aimAngle:0, bossPhase:0,
-    // 생김새 변형 (색조 랜덤)
     colVariant: ['#f40','#c0f','#0af','#ff0','#f00','#4f0','#f80'][Math.random()*7|0],
+    _prePlaced: true,   // 미리 배치됨 표시
   });
-  bossSpawned=true;
-  screenShake=60;
-  SFX.bossSpawn();
-  const bossEmoji=MEMOJI[bossType]||'👑';
-  showAlert(`${bossEmoji} ${cfg.label} 등장!`);
-  addLog(`${bossEmoji} ${cfg.label}이(가) 각성했다!!!`,'boss');
-  document.getElementById('boss-bar').style.display='block';
+  // bossSpawned는 false 유지 - 방 진입 시 true로 변경됨
 }
 
 // ═══════════════════════════════════════════════════════
 //  공격
 // ═══════════════════════════════════════════════════════
 // ── 구르기(대시) ──────────────────────────────────
-const DASH_SPEED = 9.5;   // 대시 속도
-const DASH_FRAMES = 12;   // 대시 지속 프레임
+const DASH_SPEED = 14;    // 대시 속도
+const DASH_FRAMES = 16;   // 대시 지속 프레임
 const DASH_CD = 180;      // 대시 쿨다운 (3초)
-const DASH_IFRAMES = 14;  // 무적 프레임
+const DASH_IFRAMES = 20;  // 무적 프레임
 
 function doDash(){
   if(multiMode){
@@ -519,8 +514,18 @@ function update(){
     if(!bossSpawned){
       const ba=bossArena;
       if(player.x>ba.x&&player.x<ba.x+ba.w&&player.y>ba.y&&player.y<ba.y+ba.h){
-        SFX.door();
-        spawnBoss();
+        // 방 진입 시 보스 활성화 (이미 배치됨)
+        bossSpawned=true;
+        screenShake=60;
+        SFX.bossSpawn&&SFX.bossSpawn();
+        const boss=monsters.find(m=>m.type&&m.type.startsWith('boss'));
+        if(boss){
+          const cfg=MTYPE[boss.type];
+          const bossEmoji=MEMOJI[boss.type]||'👑';
+          showAlert(`${bossEmoji} ${cfg.label} 각성!`);
+          addLog(`${bossEmoji} ${cfg.label}이(가) 각성했다!!!`,'boss');
+          document.getElementById('boss-bar').style.display='block';
+        }
       }
     }
   }
