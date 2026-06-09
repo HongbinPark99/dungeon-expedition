@@ -217,4 +217,4 @@ const CUSTOM_CHAR_DRAW = {
   photo4: (c,x,y,sz,f,t)=>drawPhotoChar(c,'photo4',x,y,sz,'#cc88ff',t),
 };
 
-let selectedChar = 'photo0';
+// selectedChar: map.js 전역변수 블록에서 선언
