@@ -291,9 +291,11 @@ function draw(){
   monsters.forEach(m=>{
     if(!m.alive) return;
     const ddx=m.x-px, ddy=m.y-py;
-    if(ddx*ddx+ddy*ddy>sr2*2.5) return;
+    const isBossM=m.type&&m.type.startsWith('boss');
+    // 보스는 거리 무관 렌더, 일반 몬스터는 시야 범위만
+    if(!isBossM && ddx*ddx+ddy*ddy>sr2*2.5) return;
     const sx=m.x-camX, sy=m.y-camY;
-    const isBoss=m.type&&m.type.startsWith('boss');
+    const isBoss=isBossM;
     const dispSz=isBoss?m.size*1.8:m.size*1.5;
     const hpBarY=sy-dispSz-4;
 
