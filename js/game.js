@@ -133,7 +133,7 @@ const MEMOJI={
   boss:'👑', boss2:'🌑', boss3:'❄️', boss4:'⚡', boss5:'💀',
 };
 
-let nextId=1;
+// nextId: map.js에서 선언
 
 // ── 스테이지별 몬스터 풀 계산 ─────────────────────────
 function getMonsterPool(stg){
@@ -965,7 +965,7 @@ const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
 // 화면에 보이는 영역만 drawImage로 잘라서 그림
 // explored/inSight는 fog로 처리하므로 여기선 전체 타일만 캐시
-let _exploredVersion=0, _lastExploredVersion=-1;
+// _exploredVersion: map.js 전역변수 블록에서 선언
 
 function _rebuildTileCache(){
   if(!_tileCanvas||_tileCanvas.width!==MAP_W||_tileCanvas.height!==MAP_H){
