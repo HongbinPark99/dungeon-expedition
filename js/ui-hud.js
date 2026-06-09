@@ -5,7 +5,6 @@ function addLog(msg,type=''){
   el.innerHTML=logEntries.slice(0,7).map(e=>`<div class="le${e.type?' '+e.type:''}">${e.msg}</div>`).join('');
 }
 
-let alertTimer=0;
 function showAlert(msg){
   const el=document.getElementById('alert');
   document.getElementById('alert-msg').textContent=msg;
