@@ -1,108 +1,5 @@
-function updateMultiClient(){
-  tick++;
-  if(!player) return;
-  // WS 연결 상태와 무관하게 로컬 물리/렌더는 계속
-
-  // 마우스 facing
-  if(player.alive){
-    player.facing=Math.atan2(
-      (mouse.y+camY)-player.y,
-      (mouse.x+camX)-player.x
-    );
-  }
-
-  // 구르기 물리 (싱글과 동일 - moveSlide 사용)
-  if(player.dashFrames>0){
-    const dr=moveSlide(player.x,player.y,player.x+player.dashVx,player.y+player.dashVy);
-    player.x=Math.max(TILE,Math.min(MAP_W-TILE,dr.x));
-    player.y=Math.max(TILE,Math.min(MAP_H-TILE,dr.y));
-    player.dashFrames--;
-  }
-  if(player.dashCd>0) player.dashCd--;
-  if(player.iframes>0) player.iframes--;
-  if(player.attackCd>0) player.attackCd--;
-  if(screenShake>0) screenShake--;
-
-  // 카메라 추적 (멀티도 동일하게)
-  if(player){
-    const tx=player.x-canvas.width/2, ty=player.y-canvas.height/2;
-    camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
-    camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
-    camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
-  }
-
-  // fog 업데이트
-  if(tick%4===0) updateFog();
-
-  // 파티클
-  let pi=0;
-  for(let i=0;i<particles.length;i++){
-    const p=particles[i];
-    p.x+=p.vx; p.y+=p.vy; p.vx*=0.88; p.vy*=0.88; p.life--;
-    if(p.life>0) particles[pi++]=p;
-  }
-  particles.length=pi;
-
-  // HUD
-  if(tick%6===0) updateMobileSkillHUD();
-
-  // ── 멀티 아이템 픽업 ──
-  if(!window._pickedItems) window._pickedItems=new Set();
-  if(player && player.alive){
-    items.forEach(it=>{
-      it.pulse=(it.pulse||0)+1;
-      if(Math.hypot(it.x-player.x,it.y-player.y)<22 && !window._pickedItems.has(it.id)){
-        window._pickedItems.add(it.id);
-        // 서버에 픽업 알림 (1회만)
-        wsSend({type:'pickup', itemId:it.id});
-        // 로컬 즉시 반영 (서버 응답 전 UX)
-        it.life=0;
-        try{SFX.item();}catch(e){}
-        if(it.type==='hp'){
-          player.hp=Math.min(player.maxHp||120, player.hp+30);
-          addLog('❤️ HP +30 회복','win');
-        } else if(it.type==='bomb_charge'){
-          skillCd.bomb=0;
-          addLog('💣 폭탄 충전!','win');
-        } else if(it.type==='shield_charge'){
-          skillCd.shield=0;
-          addLog('🛡 방패 충전!','win');
-        } else if(it.type==='thunder_charge'){
-          skillCd.thunder=0;
-          addLog('⚡ 번개 충전!','win');
-        } else if(it.type==='speed'){
-          player.speedBoost=(player.speedBoost||0)+180;
-          addLog('👟 속도 부스트!','win');
-        } else if(it.type&&it.type.startsWith('weapon_')){
-          const wid=it.type.slice(7);
-          const wp2=WEAPONS[wid];
-          if(wp2){ player.weapon=wid; addLog(`${wp2.emoji} ${wp2.name} 획득!`,'win'); updateWeaponHUD(); }
-        }
-        const icol=it.type.startsWith('weapon_')?WEAPONS[it.type.slice(7)]?.col||'#ffd':ITEM_COL[it.type]||'#ffd';
-        spawnParticles(it.x,it.y,icol,12);
-      }
-    });
-    items=items.filter(it=>it.life>0);
-  }
-
-  // ── dangerZonesFx 수명 감소 (번개/폭발 범위 이펙트) ──
-  dangerZonesFx.forEach(d=>d.life--);
-  dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
-
-  // ── attackFx 수명 감소 ──
-  let ai2=0;
-  for(let i=0;i<attackFx.length;i++){
-    attackFx[i].life--;
-    if(attackFx[i].life>0) attackFx[ai2++]=attackFx[i];
-  }
-  attackFx.length=ai2;
-
-  // ── 멀티 스킬 쿨다운 카운트다운 ──
-  if(skillCd.bomb>0)    skillCd.bomb--;
-  if(skillCd.shield>0)  skillCd.shield--;
-  if(skillCd.thunder>0) skillCd.thunder--;
-  if(shieldActive>0)    shieldActive--;
-}
+// updateMultiClient는 update()로 통합됨 - 호환성 유지용 빈 함수
+function updateMultiClient(){ /* 통합됨 - update() 사용 */ }
 
 
 function loop(t=0){
@@ -110,22 +7,16 @@ function loop(t=0){
   const dt=Math.min(t-lastT, 100);
   lastT=t;
 
-  if(multiMode){
-    // 멀티: 서버가 게임 로직 처리, 클라이언트는 렌더+카메라+입력만
-    try{ updateMultiClient(); }catch(e){ console.warn('[multi update]',e); }
-    try{ draw(); }catch(e){ console.warn('[multi draw]',e); }
-    try{ multiDrawPlayers(); }catch(e){}
-    return;
-  }
-
+  // 싱글/멀티 공통: update() → draw()
   accumT+=dt;
   let steps=0;
   while(accumT>=FIXED_DT && steps<3){
-    update();
+    try{ update(); }catch(e){ console.warn('[update]',e); }
     accumT-=FIXED_DT;
     steps++;
   }
-  draw();
+  try{ draw(); }catch(e){ console.warn('[draw]',e); }
+  if(multiMode){ try{ multiDrawPlayers(); }catch(e){} }
 }
 
 // ── 버튼 ─────────────────────────────────────────────
@@ -380,13 +271,15 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        player.x=me.x; player.y=me.y;
+        // 위치: 서버와 차이가 크면 보정, 작으면 유지 (로컬 예측 보존)
+        const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
+        if(posDiff>80){ player.x=me.x; player.y=me.y; } // 큰 차이만 snap
+        else if(posDiff>5){ player.x+=(me.x-player.x)*0.3; player.y+=(me.y-player.y)*0.3; } // 부드럽게 보정
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         // iframes/dashCd는 로컬 값 유지 (서버 덮어쓰기 방지)
         if(!player.dashFrames) player.iframes=me.iframes;
         player.shieldActive=me.shieldActive||0;
-        player.facing=me.facing||0;
         if(!player.charId) player.charId=me.charId||(window._charIdMap&&window._charIdMap[me.id])||selectedChar||'photo0';
         // 무기 동기화 (서버에서 무기 정보 오면 반영)
         if(me.weapon && WEAPONS[me.weapon]) player.weapon=me.weapon;
@@ -429,7 +322,10 @@ function connectMultiWs(url, joinMsg){
       totalKills=msg.totalKills||0;
       if(msg.gold!=null){ gold=msg.gold; const sg=document.getElementById('s-gold'); if(sg) sg.textContent=gold; }
       gameRunning=true;
-      bossSpawned=msg.bossSpawned||false;
+      if(msg.bossSpawned && !bossSpawned){
+        bossSpawned=true;
+        document.getElementById('boss-bar').style.display='block';
+      }
 
       // 카메라 (첫 state 시 즉시 점프)
       if(me && !window._multiCamInit){
