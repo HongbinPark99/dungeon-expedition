@@ -372,13 +372,11 @@ function doSkillShield(){
 function doSkillThunder(){
   if(multiMode){
     if(!player||!player.alive) return;
-    if(skillCd.thunder>0) return;       // skillCd로 통일 (Date.now 제거)
+    if(skillCd.thunder>0) return;
     skillCd.thunder=CD_THUNDER;
     wsSend({type:'thunder'});
     try{SFX.thunder&&SFX.thunder();}catch(e){}
-    // 이펙트 (life:25 → updateMultiClient에서 매 프레임 감소됨)
-    dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#aaf',type:'thunder'});
-    spawnParticles(player.x,player.y,'#ccf',12);
+    // 이펙트는 서버 thunder_fx 응답에서만 push (이중 잔상 방지)
     addLog('⚡ 번개 발동!');
     return;
   }
