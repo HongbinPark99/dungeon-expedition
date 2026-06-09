@@ -890,7 +890,7 @@ function update(){
   } else {
     document.getElementById('boss-bar').style.display='none';
   }
-}
+
 
 // ── Fog ─────────────────────────────────────────────
 function updateFog(){
