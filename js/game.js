@@ -332,7 +332,7 @@ function doSkillBomb(){
     if(!window._multiLastBomb) window._multiLastBomb=0;
     if(now-window._multiLastBomb < 6000) return;
     window._multiLastBomb=now;
-    wsSend({type:'bomb'});
+    wsSend({type:'bomb', facing:player.facing||0});
     try{SFX.explode();}catch(e){}
     // 로컬 쿨다운 UI 즉시 반영
     skillCd.bomb=360;
