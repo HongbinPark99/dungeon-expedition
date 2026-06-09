@@ -255,19 +255,17 @@ function doDash(){
   if(multiMode){
     if(!player||!player.alive) return;
     if(player.dashCd>0) return;
-    // 키보드 방향 우선, 없으면 조이스틱, 없으면 facing 방향
+    // 방향 계산
     let dx=(keys['ArrowRight']||keys['d']||keys['D']?1:0)-(keys['ArrowLeft']||keys['a']||keys['A']?1:0);
     let dy=(keys['ArrowDown']||keys['s']||keys['S']?1:0)-(keys['ArrowUp']||keys['w']||keys['W']?1:0);
     if(!dx&&!dy&&typeof joyState!=='undefined'&&joyState&&joyState.active){
       dx=joyState.dx||0; dy=joyState.dy||0;
     }
     const ang=(dx||dy)?Math.atan2(dy,dx):(player.facing||0);
-    player.dashVx=Math.cos(ang)*DASH_SPEED;
-    player.dashVy=Math.sin(ang)*DASH_SPEED;
-    player.dashFrames=DASH_FRAMES;
+    // 서버에 전송 (서버가 대시 물리 처리)
+    wsSend({type:'dash', angle:ang});
+    // 로컬 쿨다운만 설정 (서버 응답 전 중복 입력 방지)
     player.dashCd=DASH_CD;
-    player.iframes=DASH_IFRAMES;
-    wsSend({type:'dash', angle:ang});  // angle 포함
     try{SFX.dash();}catch(e){}
     return;
   }
@@ -753,6 +751,7 @@ function update(){
     }
   });
   bombs=bombs.filter(b=>b.alive);
+  // dangerZonesFx life 감소 (gameRunning 상관없이 항상 실행)
   dangerZonesFx.forEach(d=>d.life--);
   dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
 
