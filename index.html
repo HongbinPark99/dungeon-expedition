@@ -550,6 +550,9 @@ canvas{display:block;cursor:none;}
       <div class="m-skill-btn m-ready" id="m-shield" data-skill="shield">
         <span>🛡</span><span class="m-cd" id="m-cd-shield">준비</span>
       </div>
+      <div class="m-skill-btn m-ready" id="m-dash" style="border-color:#4af;">
+        <span>💨</span><span class="m-cd" id="m-cd-dash">준비</span>
+      </div>
       <div class="m-skill-btn m-ready" id="m-bomb" data-skill="bomb">
         <span>💣</span><span class="m-cd" id="m-cd-bomb">준비</span>
       </div>
@@ -1168,6 +1171,9 @@ function initMobileControls(){
   document.getElementById('m-thunder').addEventListener('touchstart', e=>{
     e.preventDefault(); doSkillThunder();
   },{passive:false});
+  // 대시 버튼
+  const _mDash=document.getElementById('m-dash');
+  if(_mDash) _mDash.addEventListener('touchstart',e=>{e.preventDefault();doDash();},{passive:false});
 }
 
 // 조이스틱 입력을 키보드 입력에 합산
@@ -1745,9 +1751,13 @@ const DASH_IFRAMES = 14;  // 무적 프레임
 function doDash(){
   if(multiMode){
     if(!player||!player.alive) return;
-    if(player.dashCd>0) return;  // dashCd로만 쿨다운 체크
-    const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
-    const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
+    if(player.dashCd>0) return;
+    // 키보드 방향 우선, 없으면 조이스틱, 없으면 facing 방향
+    let dx=(keys['ArrowRight']||keys['d']||keys['D']?1:0)-(keys['ArrowLeft']||keys['a']||keys['A']?1:0);
+    let dy=(keys['ArrowDown']||keys['s']||keys['S']?1:0)-(keys['ArrowUp']||keys['w']||keys['W']?1:0);
+    if(!dx&&!dy&&typeof joyState!=='undefined'&&joyState&&joyState.active){
+      dx=joyState.dx||0; dy=joyState.dy||0;
+    }
     const ang=(dx||dy)?Math.atan2(dy,dx):(player.facing||0);
     player.dashVx=Math.cos(ang)*DASH_SPEED;
     player.dashVy=Math.sin(ang)*DASH_SPEED;
@@ -1858,24 +1868,14 @@ function doSkillShield(){
 
 function doSkillThunder(){
   if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastThunder) window._multiLastThunder=0;
-    if(now-window._multiLastThunder < 5000) return; // CD_THUNDER=300프레임=5초
-    window._multiLastThunder=now;
+    if(!player||!player.alive) return;
+    if(skillCd.thunder>0) return;       // skillCd로 통일 (Date.now 제거)
+    skillCd.thunder=CD_THUNDER;
     wsSend({type:'thunder'});
-    SFX.thunder&&SFX.thunder();
-    // 로컬 쿨다운 UI + 번개 이펙트 즉시 반영
-    skillCd.thunder=300;
-    if(player){
-      const THUNDER_R=180, THUNDER_DMG=55;
-      monsters.forEach(m=>{
-        if(!m.alive) return;
-        if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
-          spawnParticles(m.x,m.y,'#ccf',10);
-        }
-      });
-      dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#aaf',type:'thunder'});
-    }
+    try{SFX.thunder&&SFX.thunder();}catch(e){}
+    // 이펙트 (life:25 → updateMultiClient에서 매 프레임 감소됨)
+    dangerZonesFx.push({x:player.x,y:player.y,r:180,life:25,col:'#aaf',type:'thunder'});
+    spawnParticles(player.x,player.y,'#ccf',12);
     addLog('⚡ 번개 발동!');
     return;
   }
@@ -4314,6 +4314,18 @@ function updateMultiClient(){
     });
     items=items.filter(it=>it.life>0);
   }
+
+  // ── dangerZonesFx 수명 감소 (번개/폭발 범위 이펙트) ──
+  dangerZonesFx.forEach(d=>d.life--);
+  dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
+
+  // ── attackFx 수명 감소 ──
+  let ai2=0;
+  for(let i=0;i<attackFx.length;i++){
+    attackFx[i].life--;
+    if(attackFx[i].life>0) attackFx[ai2++]=attackFx[i];
+  }
+  attackFx.length=ai2;
 
   // ── 멀티 스킬 쿨다운 카운트다운 ──
   if(skillCd.bomb>0)    skillCd.bomb--;
