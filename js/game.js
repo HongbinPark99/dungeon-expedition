@@ -280,7 +280,12 @@ function doAttack(){
   player.attackCd=wp.cd;
   const angle=player.facing!==undefined?player.facing:0;
   try{_getACtx();SFX.shoot();}catch(e){}
-  // 클라이언트 총알 생성 (싱글: 실제 판정, 멀티: 시각효과)
+  if(multiMode){
+    // 멀티: 서버에만 알림, 총알은 서버 state로 렌더링
+    wsSend({type:'attack'});
+    return;
+  }
+  // 싱글: 클라이언트에서 직접 총알 생성
   for(let i=0;i<wp.count;i++){
     const sp=wp.count>1?((i-(wp.count-1)/2)*wp.spread*1.1):(Math.random()-0.5)*wp.spread;
     const a=angle+sp;
@@ -298,8 +303,6 @@ function doAttack(){
       isMob:false,
     });
   }
-  // 멀티: 서버에도 알림
-  if(multiMode) wsSend({type:'attack'});
 }
 
 function doSkillBomb(){
@@ -309,16 +312,19 @@ function doSkillBomb(){
   skillCd.bomb=CD_BOMB;
   try{SFX.explode();}catch(e){}
   const angle=player.facing!==undefined?player.facing:0;
-  // 클라이언트 폭탄 생성 (싱글: 실제 판정, 멀티: 시각효과)
+  addLog('💣 폭탄 투척!');
+  if(multiMode){
+    // 멀티: 서버에만 알림, 폭탄은 서버 state로 렌더링
+    wsSend({type:'bomb', facing:angle});
+    return;
+  }
+  // 싱글: 클라이언트에서 직접 폭탄 생성
   bombs.push({
     x:player.x, y:player.y,
     vx:Math.cos(angle)*5, vy:Math.sin(angle)*5,
     dist:0, maxDist:200, exploded:false, explodeTimer:0,
     radius:0, maxRadius:90, alive:true,
   });
-  addLog('💣 폭탄 투척!');
-  // 멀티: 서버에도 알림
-  if(multiMode) wsSend({type:'bomb', facing:angle});
 }
 
 function doSkillShield(){
@@ -339,28 +345,27 @@ function doSkillThunder(){
   if(!gameRunning && !multiMode) return;
   skillCd.thunder=CD_THUNDER;
   try{SFX.thunder&&SFX.thunder();}catch(e){}
-  // 시각 이펙트 즉시 (싱글/멀티 동일)
+  if(multiMode){
+    // 멀티: 서버에만 알림 (이펙트는 thunder_fx 수신 시 표시)
+    wsSend({type:'thunder'});
+    addLog('⚡ 번개 발동!');
+    return;
+  }
+  // 싱글: 클라이언트에서 직접 처리
   const THUNDER_R=180, THUNDER_DMG=55;
   dangerZonesFx.push({x:player.x,y:player.y,r:THUNDER_R,life:25,col:'#aaf',type:'thunder'});
   spawnParticles(player.x,player.y,'#ccf',12);
-  if(!multiMode){
-    // 싱글: 클라이언트에서 직접 데미지 처리
-    let hit=0;
-    monsters.forEach(m=>{
-      if(!m.alive) return;
-      if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
-        m.hp-=THUNDER_DMG;
-        spawnParticles(m.x,m.y,'#ccf',10);
-        hit++;
-        if(m.hp<=0) killMonster(m);
-      }
-    });
-    addLog(`⚡ 번개 범위공격! ${hit}마리 피격`,'kill');
-  } else {
-    // 멀티: 서버에 알림 (서버가 데미지 처리)
-    wsSend({type:'thunder'});
-    addLog('⚡ 번개 발동!');
-  }
+  let hit=0;
+  monsters.forEach(m=>{
+    if(!m.alive) return;
+    if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
+      m.hp-=THUNDER_DMG;
+      spawnParticles(m.x,m.y,'#ccf',10);
+      hit++;
+      if(m.hp<=0) killMonster(m);
+    }
+  });
+  addLog(`⚡ 번개 범위공격! ${hit}마리 피격`,'kill');
 }
 
 function killMonster(m){
