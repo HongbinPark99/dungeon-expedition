@@ -369,8 +369,11 @@ function connectMultiWs(url, joinMsg){
     if(msg.type==='player_leave') addLog(`🚪 ${msg.name} 퇴장 (${msg.count}/3명)`);
     if(msg.type==='attack_fx') attackFx.push({x:msg.x,y:msg.y,r:68,life:14,pid:msg.pid});
     if(msg.type==='thunder_fx'){
-      dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
-      spawnParticles(msg.x,msg.y,'#ccf',12);
+      // thunder_fx는 다른 플레이어의 번개 이펙트 (내 것은 doSkillThunder에서 이미 처리)
+      if(msg.pid !== myMultiId){
+        dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
+        spawnParticles(msg.x,msg.y,'#ccf',12);
+      }
     }
   };
 }
