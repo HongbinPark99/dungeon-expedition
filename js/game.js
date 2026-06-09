@@ -478,7 +478,7 @@ function update(){
     }
     // 대시 쿨다운
     if(player.dashCd>0) player.dashCd--;
-        // 멀티 입력 전송: multi.js setInterval에서 처리);
+    // 멀티 입력 전송: multi.js setInterval에서 처리
     }
 
     // 보스 방 진입
