@@ -477,6 +477,14 @@ wss.on('connection',ws=>{
     }
     if(msg.type==='dash'&&player.alive){
       player.iframes=14;
+      // 대시 방향으로 서버에서도 위치 이동 (클라이언트 예측과 일치)
+      const dashAngle = (typeof msg.angle==='number') ? msg.angle : (player.facing||0);
+      const DASH_SPD=9.5, DASH_FR=12;
+      let dax=Math.cos(dashAngle)*DASH_SPD*DASH_FR*0.5;
+      let day=Math.sin(dashAngle)*DASH_SPD*DASH_FR*0.5;
+      // 맵 경계 내에서 이동 (간단 충돌 없이 범위만 클램프)
+      player.x=Math.max(48,Math.min((playerRoom.MAP_W||4000)-48, player.x+dax));
+      player.y=Math.max(48,Math.min((playerRoom.MAP_H||3200)-48, player.y+day));
       broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
       return;
     }
