@@ -271,17 +271,10 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        // 위치 보정: 대시 중/직후에는 서버값 무시
-        // player._dashEndTick: 대시 끝난 틱 (60틱=1초간 snap 억제)
-        if(player.dashFrames>0){
-          player._dashEndTick = tick + 30; // 대시 끝나도 0.5초간 보정 억제
-        } else if(player._dashEndTick && tick < player._dashEndTick){
-          // 대시 직후 - 서버가 아직 이전 위치 갖고 있으므로 snap 억제
-        } else {
-          const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
-          if(posDiff>120){ player.x=me.x; player.y=me.y; } // 임계값 상향
-          else if(posDiff>10){ player.x+=(me.x-player.x)*0.15; player.y+=(me.y-player.y)*0.15; }
-        }
+        // 위치: 서버 state 그대로 따름 (서버가 대시 물리 처리)
+        player.x=me.x; player.y=me.y;
+        // dashFrames도 서버값 반영
+        player.dashFrames=me.dashFrames||0;
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         // iframes/dashCd는 로컬 값 유지 (서버 덮어쓰기 방지)
