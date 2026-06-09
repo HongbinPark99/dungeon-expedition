@@ -292,8 +292,10 @@ function draw(){
     if(!m.alive) return;
     const ddx=m.x-px, ddy=m.y-py;
     const isBossM=m.type&&m.type.startsWith('boss');
-    // 보스는 거리 무관 렌더, 일반 몬스터는 시야 범위만
+    // 보스는 거리/fog 무관 항상 렌더, 일반 몬스터는 시야 범위만
     if(!isBossM && ddx*ddx+ddy*ddy>sr2*2.5) return;
+    // 보스: fog 위에 렌더하기 위해 ctx.save/restore 후 globalCompositeOperation 초기화
+    if(isBossM){ ctx.save(); ctx.globalCompositeOperation='source-over'; }
     const sx=m.x-camX, sy=m.y-camY;
     const isBoss=isBossM;
     const dispSz=isBoss?m.size*1.8:m.size*1.5;
@@ -320,6 +322,7 @@ function draw(){
       ctx.textAlign='center'; ctx.textBaseline='bottom';
       ctx.fillText(`★ ${m.label||m.type}`, sx, hpBarY-8);
     }
+    if(isBoss){ ctx.restore(); } // fog 위 렌더 종료
     ctx.restore();
   });
 
