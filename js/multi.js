@@ -18,8 +18,7 @@ function updateMultiClient(){
     if(!isWall(nx,player.y)) player.x=nx;
     if(!isWall(player.x,ny)) player.y=ny;
     player.dashFrames--;
-    player.dashVx*=0.85;
-    player.dashVy*=0.85;
+    // 감속 없음 - 싱글과 동일하게 일정 속도
   }
   if(player.dashCd>0) player.dashCd--;
   if(player.iframes>0) player.iframes--;
