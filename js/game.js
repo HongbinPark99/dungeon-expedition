@@ -176,7 +176,8 @@ function spawnMonster(type){
   }while(
     (isWall(x,y)||
     Math.hypot(x-player.x,y-player.y)<280||
-    (x>bossArena.x-100&&y>bossArena.y-100))&&tries<80
+    (x>bossArena.x-TILE&&x<bossArena.x+bossArena.w+TILE&&
+    y>bossArena.y-TILE&&y<bossArena.y+bossArena.h+TILE))&&tries<80
   );
   if(tries>=80) return;
 
@@ -245,8 +246,8 @@ function spawnBoss(){
 //  공격
 // ═══════════════════════════════════════════════════════
 // ── 구르기(대시) ──────────────────────────────────
-const DASH_SPEED = 14;    // 대시 속도
-const DASH_FRAMES = 16;   // 대시 지속 프레임
+const DASH_SPEED = 18;    // 대시 속도
+const DASH_FRAMES = 20;   // 대시 지속 프레임
 const DASH_CD = 180;      // 대시 쿨다운 (3초)
 const DASH_IFRAMES = 20;  // 무적 프레임
 
