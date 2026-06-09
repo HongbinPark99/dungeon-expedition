@@ -408,6 +408,8 @@ function connectMultiWs(url, joinMsg){
       }
 
       // 아이템 전역변수 주입
+      // 멀티 폭탄 렌더용
+      if(msg.bombs!==undefined) window._multiBombs=msg.bombs||[];
       if(msg.items){
         items=(msg.items||[]).map(it=>({...it,pulse:it.pulse||0,life:600}));
         // 서버에서 사라진 아이템은 pickedItems에서도 제거
