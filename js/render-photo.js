@@ -135,7 +135,6 @@ function drawPhotoMonster(c, photoKey, cx, cy, sz, bodyColor, enraged, warnPhase
 const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
 const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
-let mouseAttacking=false; // 마우스 버튼 홀드 시 연사
 
 canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
