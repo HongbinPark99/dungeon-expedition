@@ -252,54 +252,35 @@ const DASH_CD = 180;      // 대시 쿨다운 (3초)
 const DASH_IFRAMES = 20;  // 무적 프레임
 
 function doDash(){
-  if(multiMode){
-    if(!player||!player.alive) return;
-    if(player.dashCd>0) return;
-    // 방향 계산
-    let dx=(keys['ArrowRight']||keys['d']||keys['D']?1:0)-(keys['ArrowLeft']||keys['a']||keys['A']?1:0);
-    let dy=(keys['ArrowDown']||keys['s']||keys['S']?1:0)-(keys['ArrowUp']||keys['w']||keys['W']?1:0);
-    if(!dx&&!dy&&typeof joyState!=='undefined'&&joyState&&joyState.active){
-      dx=joyState.dx||0; dy=joyState.dy||0;
-    }
-    const ang=(dx||dy)?Math.atan2(dy,dx):(player.facing||0);
-    // 서버에 전송 (서버가 대시 물리 처리)
-    wsSend({type:'dash', angle:ang});
-    // 로컬 쿨다운만 설정 (서버 응답 전 중복 입력 방지)
-    player.dashCd=DASH_CD;
-    try{SFX.dash();}catch(e){}
-    return;
+  // 공통 조건 체크
+  if(!player||!player.alive||player.dashCd>0) return;
+  // 방향 계산 (싱글/멀티 동일)
+  let dx=(keys['ArrowRight']||keys['d']||keys['D']?1:0)-(keys['ArrowLeft']||keys['a']||keys['A']?1:0);
+  let dy=(keys['ArrowDown']||keys['s']||keys['S']?1:0)-(keys['ArrowUp']||keys['w']||keys['W']?1:0);
+  if(!dx&&!dy&&typeof joyState!=='undefined'&&joyState&&joyState.active){
+    dx=joyState.dx||0; dy=joyState.dy||0;
   }
-  if(!player||!player.alive) return;
-  if(player.dashCd>0) return;
-  // 이동 방향 또는 facing 방향으로 대시
-  const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
-  const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
-  let ang;
-  if(dx||dy) ang=Math.atan2(dy,dx);
-  else ang=player.facing||0;
+  const ang=(dx||dy)?Math.atan2(dy,dx):(player.facing||0);
+  // 로컬 물리 즉시 적용 (싱글: 실제 이동, 멀티: 클라이언트 예측)
   player.dashVx=Math.cos(ang)*DASH_SPEED;
   player.dashVy=Math.sin(ang)*DASH_SPEED;
   player.dashFrames=DASH_FRAMES;
   player.dashCd=DASH_CD;
   player.iframes=DASH_IFRAMES;
-  SFX.dash();
+  try{SFX.dash();}catch(e){}
+  // 멀티: 서버에도 알림
+  if(multiMode) wsSend({type:'dash', angle:ang});
 }
 
 function doAttack(){
-  if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastAttack) window._multiLastAttack=0;
-    if(now-window._multiLastAttack < 400) return;
-    window._multiLastAttack=now;
-    wsSend({type:'attack'});
-    try{_getACtx();SFX.shoot();}catch(e){}
-    return;
-  }
-  if(!gameRunning||!player||!player.alive||player.attackCd>0) return;
+  // 공통 조건 체크
+  if(!player||!player.alive||player.attackCd>0) return;
+  if(!gameRunning && !multiMode) return;
   const wp=WEAPONS[player.weapon]||WEAPONS.sword;
   player.attackCd=wp.cd;
   const angle=player.facing!==undefined?player.facing:0;
   try{_getACtx();SFX.shoot();}catch(e){}
+  // 클라이언트 총알 생성 (싱글: 실제 판정, 멀티: 시각효과)
   for(let i=0;i<wp.count;i++){
     const sp=wp.count>1?((i-(wp.count-1)/2)*wp.spread*1.1):(Math.random()-0.5)*wp.spread;
     const a=angle+sp;
@@ -317,26 +298,18 @@ function doAttack(){
       isMob:false,
     });
   }
+  // 멀티: 서버에도 알림
+  if(multiMode) wsSend({type:'attack'});
 }
 
 function doSkillBomb(){
-  if(multiMode){
-    if(!multiState&&!player) return;
-    const now=Date.now();
-    if(!window._multiLastBomb) window._multiLastBomb=0;
-    if(now-window._multiLastBomb < 6000) return;
-    window._multiLastBomb=now;
-    wsSend({type:'bomb', facing:player.facing||0});
-    try{SFX.explode();}catch(e){}
-    // 로컬 쿨다운 UI 즉시 반영
-    skillCd.bomb=360;
-    addLog('💣 폭탄 투척!');
-    return;
-  }
-  if(!gameRunning||!player||!player.alive||skillCd.bomb>0) return;
+  // 공통 조건 체크
+  if(!player||!player.alive||skillCd.bomb>0) return;
+  if(!gameRunning && !multiMode) return;
   skillCd.bomb=CD_BOMB;
-  SFX.explode();
+  try{SFX.explode();}catch(e){}
   const angle=player.facing!==undefined?player.facing:0;
+  // 클라이언트 폭탄 생성 (싱글: 실제 판정, 멀티: 시각효과)
   bombs.push({
     x:player.x, y:player.y,
     vx:Math.cos(angle)*5, vy:Math.sin(angle)*5,
@@ -344,57 +317,50 @@ function doSkillBomb(){
     radius:0, maxRadius:90, alive:true,
   });
   addLog('💣 폭탄 투척!');
+  // 멀티: 서버에도 알림
+  if(multiMode) wsSend({type:'bomb', facing:angle});
 }
 
 function doSkillShield(){
-  if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastShield) window._multiLastShield=0;
-    if(now-window._multiLastShield < 8000) return; // CD_SHIELD=480프레임=8초
-    window._multiLastShield=now;
-    wsSend({type:'shield'});
-    SFX.shield();
-    // 로컬 쿨다운 UI + 방패 이펙트 즉시 반영
-    skillCd.shield=480;
-    shieldActive=120;
-    addLog('🛡 방패막 발동! 2초간 무적');
-    return;
-  }
-  if(!gameRunning||!player||!player.alive||skillCd.shield>0) return;
+  // 공통 조건 체크
+  if(!player||!player.alive||skillCd.shield>0) return;
+  if(!gameRunning && !multiMode) return;
   skillCd.shield=CD_SHIELD;
-  SFX.shield();
-  shieldActive=120; // 2초 방패
+  try{SFX.shield();}catch(e){}
+  shieldActive=120;
   addLog('🛡 방패막 발동! 2초간 무적');
+  // 멀티: 서버에도 알림
+  if(multiMode) wsSend({type:'shield'});
 }
 
 function doSkillThunder(){
-  if(multiMode){
-    if(!player||!player.alive) return;
-    if(skillCd.thunder>0) return;
-    skillCd.thunder=CD_THUNDER;
-    wsSend({type:'thunder'});
-    try{SFX.thunder&&SFX.thunder();}catch(e){}
-    // 이펙트는 서버 thunder_fx 응답에서만 push (이중 잔상 방지)
-    addLog('⚡ 번개 발동!');
-    return;
-  }
-  if(!gameRunning||!player||!player.alive||skillCd.thunder>0) return;
+  // 공통 조건 체크
+  if(!player||!player.alive||skillCd.thunder>0) return;
+  if(!gameRunning && !multiMode) return;
   skillCd.thunder=CD_THUNDER;
-  // 주변 반경 180 내 모든 몬스터에 번개 피해
+  try{SFX.thunder&&SFX.thunder();}catch(e){}
+  // 시각 이펙트 즉시 (싱글/멀티 동일)
   const THUNDER_R=180, THUNDER_DMG=55;
-  let hit=0;
-  monsters.forEach(m=>{
-    if(!m.alive) return;
-    if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
-      m.hp-=THUNDER_DMG;
-      spawnParticles(m.x,m.y,'#ccf',10);
-      hit++;
-      if(m.hp<=0) killMonster(m);
-    }
-  });
-  // 번개 시각 이펙트
   dangerZonesFx.push({x:player.x,y:player.y,r:THUNDER_R,life:25,col:'#aaf',type:'thunder'});
-  addLog(`⚡ 번개 범위공격! ${hit}마리 피격`,'kill');
+  spawnParticles(player.x,player.y,'#ccf',12);
+  if(!multiMode){
+    // 싱글: 클라이언트에서 직접 데미지 처리
+    let hit=0;
+    monsters.forEach(m=>{
+      if(!m.alive) return;
+      if(Math.hypot(m.x-player.x,m.y-player.y)<THUNDER_R){
+        m.hp-=THUNDER_DMG;
+        spawnParticles(m.x,m.y,'#ccf',10);
+        hit++;
+        if(m.hp<=0) killMonster(m);
+      }
+    });
+    addLog(`⚡ 번개 범위공격! ${hit}마리 피격`,'kill');
+  } else {
+    // 멀티: 서버에 알림 (서버가 데미지 처리)
+    wsSend({type:'thunder'});
+    addLog('⚡ 번개 발동!');
+  }
 }
 
 function killMonster(m){
@@ -470,8 +436,8 @@ function update(){
         (mouse.x+camX)-player.x
       );
     }
-    // 마우스 홀드 연사 (싱글만)
-    if(!multiMode && mouseAttacking) doAttack();
+    // 마우스 홀드 연사 (싱글/멀티 공통 - doAttack 내부에서 multiMode 처리)
+    if(mouseAttacking) doAttack();
 
     let dx=0,dy=0;
     if(keys['ArrowUp']   ||keys['w']||keys['W']) dy-=1;
