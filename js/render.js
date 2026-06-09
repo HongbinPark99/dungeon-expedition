@@ -322,7 +322,9 @@ function draw(){
   });
 
     // ── 폭탄 렌더 ────────────────────────────────────
-  bombs.forEach(b=>{
+  // 싱글 + 멀티 폭탄 통합 렌더
+  const _renderBombs = multiMode ? (window._multiBombs||[]) : bombs;
+  _renderBombs.forEach(b=>{
     const sx=b.x-camX, sy=b.y-camY;
     ctx.save();
     if(b.exploded){
