@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -347,7 +348,7 @@ canvas{display:block;cursor:none;}
 
 /* ── 상점 ── */
 #shop-screen{
-  display:none;position:fixed;inset:0;z-index:100;
+  display:none;position:fixed;inset:0;z-index:200;
   background:rgba(5,8,16,0.97);backdrop-filter:blur(8px);
   display:none;flex-direction:column;align-items:center;justify-content:center;
   font-family:'Black Han Sans',sans-serif;
@@ -1743,20 +1744,17 @@ const DASH_IFRAMES = 14;  // 무적 프레임
 
 function doDash(){
   if(multiMode){
-    const now=Date.now();
-    if(!window._multiLastDash) window._multiLastDash=0;
-    if(now-window._multiLastDash < 3000) return;
-    window._multiLastDash=now;
+    if(!player||!player.alive) return;
+    if(player.dashCd>0) return;  // dashCd로만 쿨다운 체크
+    const dx=(keys['ArrowRight']||keys['d']||keys['D'])-(keys['ArrowLeft']||keys['a']||keys['A']);
+    const dy=(keys['ArrowDown']||keys['s']||keys['S'])-(keys['ArrowUp']||keys['w']||keys['W']);
+    const ang=(dx||dy)?Math.atan2(dy,dx):(player.facing||0);
+    player.dashVx=Math.cos(ang)*DASH_SPEED;
+    player.dashVy=Math.sin(ang)*DASH_SPEED;
+    player.dashFrames=DASH_FRAMES;
+    player.dashCd=DASH_CD;
+    player.iframes=DASH_IFRAMES;
     wsSend({type:'dash'});
-    // 클라이언트 즉시 예측 (싱글과 동일 물리)
-    if(player&&player.alive){
-      const ang=player.facing||0;
-      player.dashVx=Math.cos(ang)*8;
-      player.dashVy=Math.sin(ang)*8;
-      player.dashFrames=12;
-      player.dashCd=180;
-      player.iframes=20;
-    }
     try{SFX.dash();}catch(e){}
     return;
   }
@@ -4187,6 +4185,7 @@ function showStageCleared(){
   btn.textContent='🛒 상점에서 강화하기';
   btn.onclick=()=>{
     ov.style.display='none';
+    document.getElementById('ending').style.display='none';
     showShop(stage+1);
   };
   // 처음부터 버튼 추가
@@ -4602,7 +4601,8 @@ function connectMultiWs(url, joinMsg){
         player.x=me.x; player.y=me.y;
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
-        player.iframes=me.iframes;
+        // iframes/dashCd는 로컬 값 유지 (서버 덮어쓰기 방지)
+        if(!player.dashFrames) player.iframes=me.iframes;
         player.shieldActive=me.shieldActive||0;
         player.facing=me.facing||0;
         if(!player.charId) player.charId=me.charId||(window._charIdMap&&window._charIdMap[me.id])||selectedChar||'photo0';
@@ -4979,6 +4979,7 @@ function showShop(nextStage){
     </div>`;
   }).join('')||'<div style="color:#667;padding:20px">구매 가능한 아이템 없음</div>';
 
+  document.getElementById('ending').style.display='none';
   scr.style.display='flex';
   SFX.door&&SFX.door();
 }
