@@ -11,14 +11,12 @@ function updateMultiClient(){
     );
   }
 
-  // 구르기 물리 (클라이언트 측 예측)
+  // 구르기 물리 (싱글과 동일 - moveSlide 사용)
   if(player.dashFrames>0){
-    const nx=player.x+player.dashVx;
-    const ny=player.y+player.dashVy;
-    if(!isWall(nx,player.y)) player.x=nx;
-    if(!isWall(player.x,ny)) player.y=ny;
+    const dr=moveSlide(player.x,player.y,player.x+player.dashVx,player.y+player.dashVy);
+    player.x=Math.max(TILE,Math.min(MAP_W-TILE,dr.x));
+    player.y=Math.max(TILE,Math.min(MAP_H-TILE,dr.y));
     player.dashFrames--;
-    // 감속 없음 - 싱글과 동일하게 일정 속도
   }
   if(player.dashCd>0) player.dashCd--;
   if(player.iframes>0) player.iframes--;
