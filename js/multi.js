@@ -271,10 +271,15 @@ function connectMultiWs(url, joinMsg){
           iframes:me.iframes,shieldActive:me.shieldActive||0,facing:me.facing||0,
           attackCd:0,dashCd:0,dashVx:0,dashVy:0,dashFrames:0,
           speedBoost:0,weapon:'sword',weaponAmmo:{}};
-        // 위치: 서버와 차이가 크면 보정, 작으면 유지 (로컬 예측 보존)
-        const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
-        if(posDiff>80){ player.x=me.x; player.y=me.y; } // 큰 차이만 snap
-        else if(posDiff>5){ player.x+=(me.x-player.x)*0.3; player.y+=(me.y-player.y)*0.3; } // 부드럽게 보정
+        // 위치: 대시 중에는 서버값 완전 무시 (로컬 물리 우선)
+        // 대시 끝나면 서버와 큰 차이만 보정
+        if(player.dashFrames>0){
+          // 대시 중 - 서버 위치 무시, 로컬 dashVx/dashVy 물리 유지
+        } else {
+          const posDiff=Math.hypot(player.x-me.x, player.y-me.y);
+          if(posDiff>80){ player.x=me.x; player.y=me.y; }
+          else if(posDiff>5){ player.x+=(me.x-player.x)*0.3; player.y+=(me.y-player.y)*0.3; }
+        }
         player.hp=me.hp; player.maxHp=me.maxHp;
         player.alive=me.alive;
         // iframes/dashCd는 로컬 값 유지 (서버 덮어쓰기 방지)
@@ -368,7 +373,10 @@ function connectMultiWs(url, joinMsg){
     }
     if(msg.type==='player_leave') addLog(`🚪 ${msg.name} 퇴장 (${msg.count}/3명)`);
     if(msg.type==='attack_fx') attackFx.push({x:msg.x,y:msg.y,r:68,life:14,pid:msg.pid});
-    if(msg.type==='thunder_fx') dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
+    if(msg.type==='thunder_fx'){
+      dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
+      spawnParticles(msg.x,msg.y,'#ccf',12);
+    }
   };
 }
 
