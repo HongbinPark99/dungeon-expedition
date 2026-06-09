@@ -478,15 +478,7 @@ function update(){
     }
     // 대시 쿨다운
     if(player.dashCd>0) player.dashCd--;
-    // 멀티: 입력 상태를 서버에 전송
-    if(multiMode && tick%2===0){
-      wsSend({type:'input', input:{
-        up:!!(keys['ArrowUp']||keys['w']||keys['W']),
-        down:!!(keys['ArrowDown']||keys['s']||keys['S']),
-        left:!!(keys['ArrowLeft']||keys['a']||keys['A']),
-        right:!!(keys['ArrowRight']||keys['d']||keys['D']),
-        mouseAngle: player.facing,
-      }});
+        // 멀티 입력 전송: multi.js setInterval에서 처리);
     }
 
     // 보스 방 진입
