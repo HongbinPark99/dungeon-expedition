@@ -36,8 +36,6 @@ const SHOP_ITEMS = [
   { id:'cannon',    name:'캐논',         emoji:'💣', desc:'초고데미지 단발',     cost:100, type:'weapon', wid:'cannon',  tier:4 },
 ];
 
-let _shopNextStage=1;
-
 function showShop(nextStage){
   _shopNextStage=nextStage;
   const scr=document.getElementById('shop-screen');
