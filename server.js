@@ -185,7 +185,7 @@ function createRoom(roomName){
   const id='room_'+(nextRoomId++);
   const room={
     id,name:roomName||`방 ${nextRoomId-1}`,
-    players:{},monsters:{},bullets:[],
+    players:{},monsters:{},bullets:[],bombs:[],
     state:'waiting',hostId:null,
     stage:1,kills:0,totalKills:0,tick:0,
     bossSpawned:false,nextId:1,
@@ -255,6 +255,31 @@ function gameTick(room){
     if(p.iframes>0)p.iframes--;
     if(p.shieldActive>0)p.shieldActive--;
   }
+
+  // ── 폭탄 업데이트 ──
+  if(!room.bombs) room.bombs=[];
+  room.bombs=room.bombs.filter(b=>{
+    if(b.exploded){
+      b.explodeTimer++;
+      b.radius=b.maxRadius*(b.explodeTimer/20);
+      if(b.explodeTimer===5){
+        // 폭발 범위 피해
+        for(const p of Object.values(room.players)){
+          if(!p.alive||p.iframes>0||p.shieldActive>0) continue;
+          if(dist(b,p)<b.maxRadius){ p.hp-=80; p.iframes=60; if(p.hp<=0){p.hp=0;p.alive=false;} }
+        }
+        for(const m of Object.values(room.monsters)){
+          if(!m.alive) continue;
+          if(dist(b,m)<b.maxRadius){ m.hp-=80; if(m.hp<=0){m.alive=false;room.kills++;} }
+        }
+      }
+      return b.explodeTimer<20;
+    } else {
+      b.x+=b.vx; b.y+=b.vy; b.dist+=5;
+      if(b.dist>b.maxDist||isWall(room,b.x,b.y)){ b.exploded=true; return true; }
+      return true;
+    }
+  });
 
   room.bullets=room.bullets.filter(b=>{
     b.x+=Math.cos(b.angle)*b.speed;b.y+=Math.sin(b.angle)*b.speed;b.life--;
@@ -338,6 +363,7 @@ function gameTick(room){
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
     bullets:room.bullets.map(b=>({x:b.x,y:b.y,angle:b.angle,isMob:b.isMob,col:b.col||'#f44'})),
+    bombs:(room.bombs||[]).map(b=>({x:b.x,y:b.y,exploded:b.exploded,explodeTimer:b.explodeTimer||0,radius:b.radius||0,maxRadius:b.maxRadius})),
     items:(room.items||[]).map(it=>({id:it.id,x:it.x,y:it.y,type:it.type,pulse:it.pulse||0})),
     stage:room.stage,kills:room.kills,totalKills:room.totalKills,tick:room.tick,
     bossSpawned:room.bossSpawned,
@@ -438,7 +464,16 @@ wss.on('connection',ws=>{
       broadcastRoom(playerRoom,{type:'attack_fx',x:player.x,y:player.y,pid});return;
     }
     if(msg.type==='bomb'&&player.alive){
-      for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
+      if(!playerRoom.bombs) playerRoom.bombs=[];
+      const ang=msg.facing!==undefined?msg.facing:(player.facing||0);
+      playerRoom.bombs.push({
+        x:player.x, y:player.y,
+        vx:Math.cos(ang)*5, vy:Math.sin(ang)*5,
+        dist:0, maxDist:200,
+        exploded:false, explodeTimer:0,
+        radius:0, maxRadius:90,
+      });
+      return;
     }
     if(msg.type==='dash'&&player.alive){
       player.iframes=14;
