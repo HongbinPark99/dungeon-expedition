@@ -153,17 +153,23 @@ function moveSlide(ox,oy,nx,ny,r=13){
 // ═══════════════════════════════════════════════════════
 //  게임 상태
 // ═══════════════════════════════════════════════════════
-let player, monsters, particles, attackFx;
+let player, monsters=[], particles=[], attackFx=[];
 let camX=0, camY=0;
 let kills=0, tick=0, gold=0;
 let bullets=[], bombs=[], dangerZonesFx=[], items=[];
 let skillCd={bomb:0, shield:0, thunder:0};
-let shieldActive=0; // 방패 지속 프레임
-let bossArena, bossSpawned=false, bossDefeated=false;
+let shieldActive=0;
+let bossArena=null, bossSpawned=false, bossDefeated=false;
 let gameRunning=false, gameWon=false, gameOver=false;
 let screenShake=0;
 let spawnTimer=0;
 let logEntries=[];
+let selectedChar='photo0'; // 선택된 캐릭터 ID
+let _shopNextStage=1;
+let alertTimer=0;
+let mouseAttacking=false;
+let _exploredVersion=0, _lastExploredVersion=-1;
+let nextId=1; // 아이템 ID 생성용
 
 
 // ═══════════════════════════════════════════════════════
