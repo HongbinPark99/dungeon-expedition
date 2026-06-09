@@ -246,14 +246,25 @@ function gameTick(room){
   for(const p of ps){
     if(!p.alive) continue;
     const inp=p.input||{};
-    let dx=0,dy=0;
-    if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
-    if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
-    if(dx&&dy){dx*=0.707;dy*=0.707;}
-    if(!isWall(room,p.x+dx,p.y))p.x+=dx;
-    if(!isWall(room,p.x,p.y+dy))p.y+=dy;
+    // ── 대시 물리 (서버에서 직접 처리) ──
+    if(p.dashFrames>0){
+      const nx=p.x+p.dashVx, ny=p.y+p.dashVy;
+      if(!isWall(room,nx,p.y)) p.x=nx;
+      if(!isWall(room,p.x,ny)) p.y=ny;
+      p.dashVx*=0.85; p.dashVy*=0.85;
+      p.dashFrames--;
+    } else {
+      // 일반 이동
+      let dx=0,dy=0;
+      if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
+      if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
+      if(dx&&dy){dx*=0.707;dy*=0.707;}
+      if(!isWall(room,p.x+dx,p.y))p.x+=dx;
+      if(!isWall(room,p.x,p.y+dy))p.y+=dy;
+    }
     if(p.iframes>0)p.iframes--;
     if(p.shieldActive>0)p.shieldActive--;
+    if(p.dashCd>0)p.dashCd--;
   }
 
   // ── 폭탄 업데이트 ──
@@ -358,7 +369,8 @@ function gameTick(room){
     type:'state',
     players:ps.map(p=>({id:p.id,name:p.name,x:p.x,y:p.y,hp:p.hp,maxHp:p.maxHp,
       alive:p.alive,iframes:p.iframes,shieldActive:p.shieldActive,
-      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0'})),
+      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0',
+      dashFrames:p.dashFrames||0})),
     monsters:Object.values(room.monsters).filter(m=>m.alive).map(m=>({
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
@@ -476,15 +488,13 @@ wss.on('connection',ws=>{
       return;
     }
     if(msg.type==='dash'&&player.alive){
+      if((player.dashCd||0)>0) return; // 쿨다운 중
+      const dashAngle=(typeof msg.angle==='number')?msg.angle:(player.facing||0);
+      player.dashVx=Math.cos(dashAngle)*9.5;
+      player.dashVy=Math.sin(dashAngle)*9.5;
+      player.dashFrames=12;
+      player.dashCd=180;
       player.iframes=14;
-      // 대시 방향으로 서버에서도 위치 이동 (클라이언트 예측과 일치)
-      const dashAngle = (typeof msg.angle==='number') ? msg.angle : (player.facing||0);
-      const DASH_SPD=9.5, DASH_FR=12;
-      let dax=Math.cos(dashAngle)*DASH_SPD*DASH_FR*0.5;
-      let day=Math.sin(dashAngle)*DASH_SPD*DASH_FR*0.5;
-      // 맵 경계 내에서 이동 (간단 충돌 없이 범위만 클램프)
-      player.x=Math.max(48,Math.min((playerRoom.MAP_W||4000)-48, player.x+dax));
-      player.y=Math.max(48,Math.min((playerRoom.MAP_H||3200)-48, player.y+day));
       broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
       return;
     }
