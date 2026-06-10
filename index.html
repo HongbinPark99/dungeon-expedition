@@ -5,7 +5,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-  <!-- v1781074316 -->
+  <!-- v1781074842 -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>던전 원정대</title>
 <style>
@@ -388,6 +388,41 @@ canvas{display:block;cursor:none;}
 </style>
 </head>
 <body>
+<!-- 디버그 에러 오버레이 (모바일용) -->
+<div id="errdiv" style="display:none;position:fixed;top:0;left:0;right:0;
+  background:rgba(180,0,0,0.95);color:#fff;font-size:13px;
+  padding:10px;z-index:99999;max-height:50vh;overflow-y:auto;
+  font-family:monospace;white-space:pre-wrap;word-break:break-all;"></div>
+<script>
+(function(){
+  var el=document.getElementById('errdiv');
+  var errs=[];
+  function show(msg){
+    errs.unshift(msg);
+    if(errs.length>10)errs.pop();
+    el.textContent=errs.join('\n---\n');
+    el.style.display='block';
+  }
+  window.onerror=function(msg,src,line,col,err){
+    var s=(src||'').split('/').pop();
+    show('ERR: '+msg+'\n  at '+s+':'+line+':'+col);
+    return false;
+  };
+  window.onunhandledrejection=function(e){
+    show('PROMISE: '+(e.reason&&e.reason.stack||e.reason||e));
+  };
+  // 원래 console.error도 캡처
+  var ce=console.error.bind(console);
+  console.error=function(){
+    var msg=Array.from(arguments).map(function(a){
+      return (a&&a.stack)?a.stack:String(a);
+    }).join(' ');
+    show('console.error: '+msg);
+    ce.apply(console,arguments);
+  };
+})();
+</script>
+
 
 <!-- 로비 -->
 <div id="lobby">
