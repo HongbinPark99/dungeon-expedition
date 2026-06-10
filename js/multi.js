@@ -524,11 +524,40 @@ const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 function multiDrawPlayers(){
   if(!multiState||!Array.isArray(multiState.players)) return;
   const PCOLORS=['#44aaff','#ff6688','#44dd88','#ffaa44','#cc88ff'];
+
+  // ── 부활 진행 UI ──────────────────────────────────
+  if(_reviveTarget){
+    const sx=_reviveTarget.x-camX, sy=_reviveTarget.y-camY;
+    ctx.save();
+    const pct=Math.min(1,_reviveHold/90);
+    ctx.fillStyle='rgba(0,255,120,0.25)';
+    ctx.beginPath(); ctx.arc(sx,sy,40,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(0,255,120,0.9)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(sx,sy,40,-Math.PI/2,-Math.PI/2+Math.PI*2*pct); ctx.stroke();
+    ctx.fillStyle='#0f8'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`💚 ${Math.round(pct*100)}%`, sx, sy+5);
+    ctx.fillText('F 홀드', sx, sy+20);
+    ctx.restore();
+  }
+
   multiState.players.forEach(p=>{
-    if(p.id===myMultiId) return; // 나는 싱글 draw()에서 이미 그림
+    if(p.id===myMultiId) return;
     const sxp=p.x-camX, syp=p.y-camY;
-    // 화면 밖이면 스킵
     if(sxp<-50||sxp>canvas.width+50||syp<-100||syp>canvas.height+100) return;
+
+    // ── 유령 표시 (사망한 플레이어) ──────────────────
+    if(!p.alive){
+      if((p.ghostTimer||0)>0){
+        ctx.save(); ctx.globalAlpha=0.4+Math.sin(tick*0.08)*0.15;
+        ctx.font='28px serif'; ctx.textAlign='center';
+        ctx.fillText('👻', sxp, syp+8);
+        ctx.globalAlpha=0.7; ctx.fillStyle='#aaf';
+        ctx.font='11px sans-serif';
+        ctx.fillText(`${p.name||'?'} ${Math.ceil((p.ghostTimer||0)/60)}s`, sxp, syp+26);
+        ctx.restore();
+      }
+      return;
+    }
     ctx.save();
     const blinking=p.iframes>0&&Math.floor(tick/4)%2===0;
     // 방패 링
