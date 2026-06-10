@@ -201,11 +201,16 @@ function updateMobileSkillHUD(){
 //  캐릭터 선택 시스템
 // ══════════════════════════════════════════════════════
 const CHAR_LIST = [
-  { id:'photo0', name:'자는 남자', desc:'숙면 전사',   color:'#88aaff' },
-  { id:'photo1', name:'부산 남자', desc:'해양대 용사', color:'#44dd88' },
-  { id:'photo2', name:'안경 남자', desc:'뿜뿜 마법사', color:'#ffaa44' },
-  { id:'photo3', name:'입벌린 남자', desc:'입술 전사',  color:'#ff6688' },
-  { id:'photo4', name:'눌린 남자', desc:'압박 헌터',   color:'#cc88ff' },
+  { id:'photo0', name:'자는 남자', desc:'🛡 HP +30% / 속도 -10%',  color:'#88aaff',
+    passive:{ hpMul:1.3, spdMul:0.9, cdMul:1.0, atkMul:1.0, dashCdMul:1.0, label:'탱커' } },
+  { id:'photo1', name:'부산 남자', desc:'⚡ 속도 +25% / ATK -10%', color:'#44dd88',
+    passive:{ hpMul:1.0, spdMul:1.25, cdMul:1.0, atkMul:0.9, dashCdMul:0.8, label:'스피드' } },
+  { id:'photo2', name:'안경 남자', desc:'🔮 스킬 CD -25%',          color:'#ffaa44',
+    passive:{ hpMul:1.0, spdMul:1.0, cdMul:0.75, atkMul:1.0, dashCdMul:1.0, label:'마법사' } },
+  { id:'photo3', name:'입벌린 남자', desc:'💣 폭탄 범위 +60%',      color:'#ff6688',
+    passive:{ hpMul:1.0, spdMul:1.0, cdMul:1.0, atkMul:1.0, dashCdMul:1.0, bombRangeMul:1.6, label:'폭격수' } },
+  { id:'photo4', name:'눌린 남자', desc:'💨 구르기 CD -50%',         color:'#cc88ff',
+    passive:{ hpMul:1.0, spdMul:1.0, cdMul:1.0, atkMul:1.0, dashCdMul:0.5, label:'기동대' } },
 ];
 
 // 커스텀 캐릭터 드로우 함수 맵
