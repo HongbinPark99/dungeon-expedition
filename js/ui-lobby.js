@@ -43,7 +43,7 @@ function buildCharSelectUI(){
     const card = document.createElement('div');
     card.className='char-card'+(ch.id===selectedChar?' selected':'');
     card.dataset.id=ch.id;
-    card.innerHTML=`<div class="cn">${ch.name}</div><div class="ct">${ch.desc}</div>`;
+    const passLbl=ch.passive?.label?`<div class="cp">[${ch.passive.label}]</div>`:''; card.innerHTML=`<div class="cn">${ch.name}</div><div class="ct">${ch.desc}</div>${passLbl}`;
     card.insertBefore(cv, card.firstChild);
 
     card.addEventListener('click',()=>{
