@@ -386,6 +386,13 @@ function doSkillThunder(){
 function killMonster(m){
   m.alive=false; kills++;
   spawnParticles(m.x,m.y,'#ffd700',16);
+  // ── 콤보 시스템 ──
+  comboCount++;
+  comboTimer=180; // 3초(60fps*3) 이내 다음 킬 없으면 리셋
+  let goldMul=1;
+  if(comboCount>=10){ goldMul=3; if(comboCount%10===0) addLog(`🔥 COMBO x${comboCount}!! 골드 3배!`,'win'); screenShake=Math.min(screenShake+15,40); }
+  else if(comboCount>=5){ goldMul=2; if(comboCount===5) addLog(`⚡ COMBO x5! 골드 2배!`,'win'); }
+  else if(comboCount>=3){ goldMul=1.5; if(comboCount===3) addLog(`✨ COMBO x3! 골드 1.5배`,'win'); }
   // 아이템 드랍 (30% 확률)
   if(Math.random()<0.30){
     const iTypes=['hp','bomb_charge','shield_charge','thunder_charge','speed'];
@@ -409,7 +416,7 @@ function killMonster(m){
     if(nextBossCfg) addLog(`다음: ${MEMOJI[nextBossType]||'👑'} ${nextBossCfg.label}이(가) 기다린다...`,'boss');
     setTimeout(()=>showStageCleared(),800);
   } else {
-    const g = m.elite ? (m.score/2|0)+15 : (m.score/4|0)+3;
+    const g = Math.round((m.elite ? (m.score/2|0)+15 : (m.score/4|0)+3) * goldMul);
     gold += g;
     if(g>=5) addLog(`${MEMOJI[m.type]||'👾'} ${m.label||m.type} 처치! +${g}💰`,'kill');
   }
@@ -778,6 +785,14 @@ function update(){
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
   bullets.length=bi; } // end if(!multiMode) 폭탄/총알
+
+  // ── 콤보 타이머 감소 ──
+  if(comboTimer>0){
+    comboTimer--;
+    if(comboTimer===0 && comboCount>0){
+      comboCount=0; // 콤보 리셋
+    }
+  }
 
   // ── 파티클 ───────────────────────────────────────
   let pi=0;
