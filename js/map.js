@@ -173,3 +173,5 @@ let nextId=1; // 아이템 ID 생성용
 let comboCount=0, comboTimer=0; // 콤보 시스템
 let _reviveTarget=null, _reviveHold=0; // 팀 부활
 
+// ── Audio 전역변수 (audio.js보다 먼저 선언 필요) ──
+var _audioCtx=null, _sfxMuted=false, _bgmGain=null, _bgmOscs=[];
