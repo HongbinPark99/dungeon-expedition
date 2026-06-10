@@ -375,11 +375,20 @@ function connectMultiWs(url, joinMsg){
     if(msg.type==='player_leave') addLog(`🚪 ${msg.name} 퇴장 (${msg.count}/3명)`);
     if(msg.type==='attack_fx') attackFx.push({x:msg.x,y:msg.y,r:68,life:14,pid:msg.pid});
     if(msg.type==='thunder_fx'){
-      // thunder_fx는 다른 플레이어의 번개 이펙트 (내 것은 doSkillThunder에서 이미 처리)
       if(msg.pid !== myMultiId){
         dangerZonesFx.push({x:msg.x,y:msg.y,r:msg.r,life:25,col:'#aaf',type:'thunder'});
         spawnParticles(msg.x,msg.y,'#ccf',12);
       }
+    }
+    if(msg.type==='revived'){
+      addLog(`💚 플레이어 부활!`,'win');
+      spawnParticles(player.x,player.y,'#3ef',20);
+      try{SFX.shield();}catch(e){}
+    }
+    if(msg.type==='revive_progress'){
+      // 부활 진행도 표시 (render.js에서 사용)
+      if(!window._reviveProgressMap) window._reviveProgressMap={};
+      window._reviveProgressMap[msg.pid]=msg.pct;
     }
   };
 }
