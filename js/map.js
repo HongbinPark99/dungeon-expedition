@@ -173,8 +173,3 @@ let nextId=1; // 아이템 ID 생성용
 let comboCount=0, comboTimer=0; // 콤보 시스템
 let _reviveTarget=null, _reviveHold=0; // 팀 부활
 
-
-// ═══════════════════════════════════════════════════════
-//  효과음 시스템 — Web Audio API 합성음
-// ═══════════════════════════════════════════════════════
-let _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
