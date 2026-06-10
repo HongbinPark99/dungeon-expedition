@@ -514,7 +514,7 @@ function update(){
             }
           }
         }
-        if(_reviveTarget && keys['f']||keys['F']){
+        if(_reviveTarget && (keys['f']||keys['F'])){
           _reviveHold++;
           wsSend({type:'revive_hold', targetPid:_reviveTarget.id});
           if(_reviveHold>=90){ _reviveHold=0; addLog('💚 부활 완료!','win'); }
