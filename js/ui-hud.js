@@ -23,6 +23,9 @@ function updateWeaponHUD(){
   if(ee) ee.textContent=wp.emoji;
   if(en) en.textContent=wp.name;
   if(ed) ed.textContent=wp.desc;
+  // 콤보 표시
+  const comboEl=document.getElementById('s-combo');
+  if(comboEl) comboEl.textContent=comboCount>=3?`🔥x${comboCount}`:'';
 }
 
 // ── 스테이지 클리어 화면 ──────────────────────────────
