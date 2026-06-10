@@ -500,6 +500,29 @@ function update(){
     }
     // 대시 쿨다운
     if(player.dashCd>0) player.dashCd--;
+
+    // ── 팀 부활 (멀티) ──────────────────────────────
+    if(multiMode){
+      _reviveTarget=null;
+      if(player.alive){
+        // 근처 사망 플레이어 탐색
+        if(multiState&&multiState.players){
+          for(const op of multiState.players){
+            if(op.id===myMultiId||op.alive) continue;
+            if(Math.hypot(player.x-op.x,player.y-op.y)<80){
+              _reviveTarget=op; break;
+            }
+          }
+        }
+        if(_reviveTarget && keys['f']||keys['F']){
+          _reviveHold++;
+          wsSend({type:'revive_hold', targetPid:_reviveTarget.id});
+          if(_reviveHold>=90){ _reviveHold=0; addLog('💚 부활 완료!','win'); }
+        } else {
+          if(_reviveHold>0){ wsSend({type:'revive_cancel'}); _reviveHold=0; }
+        }
+      }
+    }
     // 멀티 입력 전송: multi.js setInterval에서 처리
     }
 
