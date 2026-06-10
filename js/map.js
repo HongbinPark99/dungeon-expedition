@@ -170,6 +170,7 @@ let alertTimer=0;
 let mouseAttacking=false;
 let _exploredVersion=0, _lastExploredVersion=-1;
 let nextId=1; // 아이템 ID 생성용
+let comboCount=0, comboTimer=0; // 콤보 시스템
 
 
 // ═══════════════════════════════════════════════════════
