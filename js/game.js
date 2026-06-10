@@ -570,6 +570,31 @@ function update(){
     }
 
     if(!isBoss || playerInBossArena) m.attackCd--;
+    // ── 엘리트 특수 패턴 (체력 50% 이하, 180틱마다) ──
+    if(m.elite && m.hp < m.maxHp*0.5 && tick%180===0 && d<300){
+      const elType = m.type;
+      if(elType==='goblin'||elType==='orc'||elType==='berserker'){
+        // 돌진: 잠시 속도 2배 + 연속 공격
+        m.attackCd=Math.floor(m.attackCd/2);
+        spawnParticles(m.x,m.y,'#f80',8);
+        addLog(`💥 엘리트 ${m.label} 분노!`);
+      } else if(elType==='archer'||elType==='hunter'){
+        // 관통 화살 3방향
+        if(!multiMode){
+          for(let ai=0;ai<3;ai++){
+            const aa=Math.atan2(player.y-m.y,player.x-m.x)+(ai-1)*0.35;
+            bullets.push({x:m.x,y:m.y,vx:Math.cos(aa)*9,vy:Math.sin(aa)*9,
+              dist:0,angle:aa,alive:true,dmgOverride:m.atk*1.5,
+              pierce:true,range:550,col:'#f84',len:22,w:3,isMob:true});
+          }
+          addLog(`🏹 엘리트 ${m.label} 관통 화살!`);
+        }
+      } else if(elType==='mage'||elType==='shade'||elType==='lich'){
+        // 플레이어 주변에 번개 써클
+        dangerZonesFx.push({x:player.x,y:player.y,r:65,life:90,col:'#ccf',type:'thunder'});
+        addLog(`⚡ 엘리트 ${m.label} 번개 소환!`);
+      }
+    }
     m.warnPhase = m.attackCd<=m.warn && m.attackCd>0 && d<m.range*2.2 && (!isBoss||playerInBossArena);
 
     // 격노
