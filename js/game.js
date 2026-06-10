@@ -26,16 +26,17 @@ function initGame(keepStage=false){
 
   // 시작 위치 (첫 번째 방 중앙)
   const sr = rooms[0];
-  // 선택된 캐릭터 패시브 적용
-  const _charPassive = (CHAR_LIST.find(c=>c.id===selectedChar)||CHAR_LIST[0]).passive||{};
-  const _pHpMul   = _charPassive.hpMul||1;
-  const _pSpdMul  = _charPassive.spdMul||1;
-  window._charCdMul      = _charPassive.cdMul||1;
-  window._charAtkMul     = _charPassive.atkMul||1;
-  window._charDashCdMul  = _charPassive.dashCdMul||1;
-  window._charBombRange  = _charPassive.bombRangeMul||1;
+  // 선택된 캐릭터 패시브 적용 (안전하게)
+  const _foundChar = (typeof CHAR_LIST!=='undefined' && CHAR_LIST.find(c=>c.id===selectedChar)) || null;
+  const _charPassive = (_foundChar && _foundChar.passive) ? _foundChar.passive : {};
+  const _pHpMul   = +(_charPassive.hpMul)||1;
+  const _pSpdMul  = +(_charPassive.spdMul)||1;
+  window._charCdMul      = +(_charPassive.cdMul)||1;
+  window._charAtkMul     = +(_charPassive.atkMul)||1;
+  window._charDashCdMul  = +(_charPassive.dashCdMul)||1;
+  window._charBombRange  = +(_charPassive.bombRangeMul)||1;
+  window._charSpdMul     = _pSpdMul;
   const _baseHp = Math.round(P_HP * _pHpMul);
-  window._charSpdMul = _pSpdMul;
 
   player = {
     x: sr.cx * TILE, y: sr.cy * TILE,
@@ -48,8 +49,7 @@ function initGame(keepStage=false){
     charId: selectedChar,
   };
   // 패시브 레이블 표시
-  const _pl=(CHAR_LIST.find(c=>c.id===selectedChar)||{passive:{label:''}}).passive||{};
-  if(_pl.label) addLog(`[${_pl.label}] 패시브 적용!`,'win');
+  if(_charPassive.label && typeof addLog==='function') addLog(`[${_charPassive.label}] 패시브 적용!`,'win');
   camX = player.x - canvas.width/2;
   camY = player.y - canvas.height/2;
   // 캐시 초기화
