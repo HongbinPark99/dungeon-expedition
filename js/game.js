@@ -26,15 +26,30 @@ function initGame(keepStage=false){
 
   // 시작 위치 (첫 번째 방 중앙)
   const sr = rooms[0];
+  // 선택된 캐릭터 패시브 적용
+  const _charPassive = (CHAR_LIST.find(c=>c.id===selectedChar)||CHAR_LIST[0]).passive||{};
+  const _pHpMul   = _charPassive.hpMul||1;
+  const _pSpdMul  = _charPassive.spdMul||1;
+  window._charCdMul      = _charPassive.cdMul||1;
+  window._charAtkMul     = _charPassive.atkMul||1;
+  window._charDashCdMul  = _charPassive.dashCdMul||1;
+  window._charBombRange  = _charPassive.bombRangeMul||1;
+  const _baseHp = Math.round(P_HP * _pHpMul);
+  window._charSpdMul = _pSpdMul;
+
   player = {
     x: sr.cx * TILE, y: sr.cy * TILE,
-    hp: P_HP, maxHp: P_HP,
+    hp: _baseHp, maxHp: _baseHp,
     alive: true, iframes: 0, attackCd: 0,
     dashCd: 0, dashVx: 0, dashVy: 0, dashFrames: 0,
     facing: 0,
-    weapon: 'sword',   // 현재 무기
-    weaponAmmo: {},    // 무기별 남은 탄약 (무한=null)
+    weapon: 'sword',
+    weaponAmmo: {},
+    charId: selectedChar,
   };
+  // 패시브 레이블 표시
+  const _pl=(CHAR_LIST.find(c=>c.id===selectedChar)||{passive:{label:''}}).passive||{};
+  if(_pl.label) addLog(`[${_pl.label}] 패시브 적용!`,'win');
   camX = player.x - canvas.width/2;
   camY = player.y - canvas.height/2;
   // 캐시 초기화
@@ -265,7 +280,7 @@ function doDash(){
   player.dashVx=Math.cos(ang)*DASH_SPEED;
   player.dashVy=Math.sin(ang)*DASH_SPEED;
   player.dashFrames=DASH_FRAMES;
-  player.dashCd=DASH_CD;
+  player.dashCd=Math.round(DASH_CD*(window._charDashCdMul||1));
   player.iframes=DASH_IFRAMES;
   try{SFX.dash();}catch(e){}
   // 멀티: 서버에도 알림
@@ -309,7 +324,7 @@ function doSkillBomb(){
   // 공통 조건 체크
   if(!player||!player.alive||skillCd.bomb>0) return;
   if(!gameRunning && !multiMode) return;
-  skillCd.bomb=CD_BOMB;
+  skillCd.bomb=Math.round(CD_BOMB*(window._charCdMul||1));
   try{SFX.explode();}catch(e){}
   const angle=player.facing!==undefined?player.facing:0;
   addLog('💣 폭탄 투척!');
@@ -323,7 +338,7 @@ function doSkillBomb(){
     x:player.x, y:player.y,
     vx:Math.cos(angle)*5, vy:Math.sin(angle)*5,
     dist:0, maxDist:200, exploded:false, explodeTimer:0,
-    radius:0, maxRadius:90, alive:true,
+    radius:0, maxRadius:90*(window._charBombRange||1), alive:true,
   });
 }
 
@@ -331,7 +346,7 @@ function doSkillShield(){
   // 공통 조건 체크
   if(!player||!player.alive||skillCd.shield>0) return;
   if(!gameRunning && !multiMode) return;
-  skillCd.shield=CD_SHIELD;
+  skillCd.shield=Math.round(CD_SHIELD*(window._charCdMul||1));
   try{SFX.shield();}catch(e){}
   shieldActive=120;
   addLog('🛡 방패막 발동! 2초간 무적');
@@ -343,7 +358,7 @@ function doSkillThunder(){
   // 공통 조건 체크
   if(!player||!player.alive||skillCd.thunder>0) return;
   if(!gameRunning && !multiMode) return;
-  skillCd.thunder=CD_THUNDER;
+  skillCd.thunder=Math.round(CD_THUNDER*(window._charCdMul||1));
   try{SFX.thunder&&SFX.thunder();}catch(e){}
   if(multiMode){
     // 멀티: 서버에만 알림 (이펙트는 thunder_fx 수신 시 표시)
@@ -469,7 +484,7 @@ function update(){
     } else if(dx||dy){
       const len=Math.hypot(dx,dy);
       if(tick%18===0) SFX.step();
-      const spd2 = P_SPEED*(player.speedBoost>0?1.7:1);
+      const spd2 = P_SPEED*(window._charSpdMul||1)*(player.speedBoost>0?1.7:1);
       const nx=player.x+(dx/len)*spd2;
       const ny=player.y+(dy/len)*spd2;
       const r=moveSlide(player.x,player.y,nx,ny);
