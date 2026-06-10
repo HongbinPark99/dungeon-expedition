@@ -265,6 +265,7 @@ function gameTick(room){
     if(p.iframes>0)p.iframes--;
     if(p.shieldActive>0)p.shieldActive--;
     if(p.dashCd>0)p.dashCd--;
+    if(!p.alive&&p.ghostTimer>0)p.ghostTimer--;
   }
 
   // ── 폭탄 업데이트 ──
@@ -277,7 +278,7 @@ function gameTick(room){
         // 폭발 범위 피해
         for(const p of Object.values(room.players)){
           if(!p.alive||p.iframes>0||p.shieldActive>0) continue;
-          if(dist(b,p)<b.maxRadius){ p.hp-=80; p.iframes=60; if(p.hp<=0){p.hp=0;p.alive=false;} }
+          if(dist(b,p)<b.maxRadius){ p.hp-=80; p.iframes=60; if(p.hp<=0){p.hp=0;p.alive=false;p.ghostTimer=3600;} }
         }
         for(const m of Object.values(room.monsters)){
           if(!m.alive) continue;
@@ -298,7 +299,7 @@ function gameTick(room){
     if(b.isMob){
       for(const p of ps){
         if(!p.alive||p.iframes>0||p.shieldActive>0)continue;
-        if(dist(b,p)<18){p.hp-=b.dmg;p.iframes=60;if(p.hp<=0){p.hp=0;p.alive=false;}return false;}
+        if(dist(b,p)<18){p.hp-=b.dmg;p.iframes=60;if(p.hp<=0){p.hp=0;p.alive=false;p.ghostTimer=3600;}return false;}
       }
     } else {
       for(const m of Object.values(room.monsters)){
@@ -346,7 +347,7 @@ function gameTick(room){
       if(m.range>150){
         room.bullets.push({x:m.x,y:m.y,angle:ang,speed:5,dmg:m.atk,life:80,isMob:true,col:'#f44'});
       } else if(minD<m.size+28&&target.iframes===0&&target.shieldActive===0){
-        target.hp-=m.atk;target.iframes=50;if(target.hp<=0){target.hp=0;target.alive=false;}
+        target.hp-=m.atk;target.iframes=50;if(target.hp<=0){target.hp=0;target.alive=false;target.ghostTimer=3600;}
       }
     }
   }
@@ -370,7 +371,7 @@ function gameTick(room){
     players:ps.map(p=>({id:p.id,name:p.name,x:p.x,y:p.y,hp:p.hp,maxHp:p.maxHp,
       alive:p.alive,iframes:p.iframes,shieldActive:p.shieldActive,
       facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0',
-      dashFrames:p.dashFrames||0})),
+      dashFrames:p.dashFrames||0, ghostTimer:p.ghostTimer||0})),
     monsters:Object.values(room.monsters).filter(m=>m.alive).map(m=>({
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
@@ -457,6 +458,28 @@ wss.on('connection',ws=>{
     if(playerRoom.state!=='playing')return;
     if(msg.type==='ping'){return;}
     if(msg.type==='input'){player.input=msg.input;if(typeof msg.input?.mouseAngle==='number')player.facing=msg.input.mouseAngle;return;}
+    if(msg.type==='revive_hold'){
+      // 다른 플레이어 부활 시도 - 1.5초 홀드 후 완료
+      const target=room.players[msg.targetPid];
+      if(!target||target.alive) return;
+      const d=Math.hypot(player.x-target.x, player.y-target.y);
+      if(d>80) return;
+      if(!room._reviveProgress) room._reviveProgress={};
+      const key=pid+'->'+msg.targetPid;
+      if(!room._reviveProgress[key]) room._reviveProgress[key]=0;
+      room._reviveProgress[key]++;
+      broadcastRoom(room,{type:'revive_progress',pid:msg.targetPid,pct:room._reviveProgress[key]/90});
+      if(room._reviveProgress[key]>=90){ // 1.5초(60fps*1.5)
+        target.alive=true; target.hp=Math.round(target.maxHp*0.5);
+        target.iframes=120; target.ghostTimer=0;
+        room._reviveProgress[key]=0;
+        broadcastRoom(room,{type:'revived',pid:msg.targetPid});
+      }
+      return;
+    }
+    if(msg.type==='revive_cancel'){
+      if(room._reviveProgress) room._reviveProgress={}; return;
+    }
     if(msg.type==='pickup'){
       const it=playerRoom.items&&playerRoom.items.find(i=>i.id===msg.itemId);
       if(!it){return;}
