@@ -12,7 +12,7 @@ function draw(){
   ctx.translate(shX,shY);
   ctx.clearRect(-10,-10,W+20,H+20);
   // 스테이지별 배경색
-  ctx.fillStyle=getTheme().bg; ctx.fillRect(-10,-10,W+20,H+20);
+  ctx.fillStyle=(typeof getTheme==='function'?getTheme():{bg:'#050810'}).bg; ctx.fillRect(-10,-10,W+20,H+20);
 
   // ── 타일 렌더링 (탐험 여부 + 시야 여부 2단계) ──────
   const px=player.x, py=player.y, sr2=SIGHT_R*SIGHT_R;
