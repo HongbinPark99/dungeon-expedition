@@ -103,7 +103,7 @@ function initGame(keepStage=false){
 //  tier: 등장 최소 스테이지
 //  attackStyle: fill_circle/cone/cross/line/ring/scatter/burst/dash
 // ═══════════════════════════════════════════════════════
-const MTYPE = {
+var MTYPEE = {
   // ── 티어 1 (스테이지 1~) ─────────────────────────
   goblin:   { tier:1, hp:55,  atk:18, spd:1.9, range:60,  warn:90,  cd:115, size:12, score:10,  col:'#3c9', attackStyle:'fill_circle',  label:'고블린'  },
   skeleton: { tier:1, hp:45,  atk:14, spd:2.2, range:50,  warn:80,  cd:100, size:11, score:8,   col:'#ccc', attackStyle:'fill_scatter', label:'스켈레톤' },
