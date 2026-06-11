@@ -79,7 +79,7 @@ function initGame(keepStage=false){
   updateWeaponHUD();
   if(isMobile&&!mobileActive) initMobileControls();
 
-  const themeName = (typeof MAP_THEMES!=='undefined') ? MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)].name : '';
+  const themeName = (typeof MAP_THEMES!=='undefined'&&MAP_THEMES) ? MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)].name : '';
   if(stage===1){
     addLog('⚔ 던전 탐험을 시작합니다!','win');
     addLog('보스 방을 찾아 던전의 군주를 처치하라!');
@@ -261,10 +261,10 @@ function spawnBoss(){
 //  공격
 // ═══════════════════════════════════════════════════════
 // ── 구르기(대시) ──────────────────────────────────
-const DASH_SPEED = 18;    // 대시 속도
-const DASH_FRAMES = 20;   // 대시 지속 프레임
-const DASH_CD = 180;      // 대시 쿨다운 (3초)
-const DASH_IFRAMES = 20;  // 무적 프레임
+var DASH_SPEED = 18;    // 대시 속도
+var DASH_FRAMES = 20;   // 대시 지속 프레임
+var DASH_CD = 180;      // 대시 쿨다운 (3초)
+var DASH_IFRAMES = 20;  // 무적 프레임
 
 function doDash(){
   // 공통 조건 체크
@@ -432,7 +432,7 @@ const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_char
 // ═══════════════════════════════════════════════════════
 //  파티클
 // ═══════════════════════════════════════════════════════
-const MAX_PARTICLES=120;
+var MAX_PARTICLES=120;
 function spawnParticles(x,y,col,n=6){
   n=Math.min(n,6);
   if(particles.length>MAX_PARTICLES) return;
@@ -864,7 +864,7 @@ function update(){
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
   if(tick%6===0) updateMobileSkillHUD();
-  const boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
+  var boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
   if(tick%6===0){
     const pct=Math.max(0,player.hp/player.maxHp*100);
     document.getElementById('hf0').style.width=pct+'%';
@@ -972,7 +972,7 @@ function update(){
 
 // ── Fog ─────────────────────────────────────────────
 function updateFog(){
-  if(!player.alive) return;
+  if(!player||!player.alive) return;
   const r=Math.ceil(SIGHT_R/TILE)+1;
   const cx=player.x/TILE|0, cy=player.y/TILE|0;
   for(let dy=-r;dy<=r;dy++){
@@ -989,7 +989,7 @@ function updateFog(){
 // ═══════════════════════════════════════════════════════
 // 타일 색상
 // 스테이지별 맵 테마
-const MAP_THEMES=[
+var MAP_THEMES=[
   {floor:'#111228',wall:'#1e2040',wallTop:'#252848',wallAcc:'#2a305a',boss:'#1e0808',bg:'#050810',name:'던전'},      // 1: 클래식 던전 (청색)
   {floor:'#1a0820',wall:'#2a0835',wallTop:'#380a45',wallAcc:'#4a1060',boss:'#200010',bg:'#080510',name:'암흑 미로'}, // 2: 암흑 (보라)
   {floor:'#081818',wall:'#0d2828',wallTop:'#103535',wallAcc:'#155050',boss:'#081a20',bg:'#050a08',name:'빙하 동굴'}, // 3: 빙하 (청록)
@@ -997,7 +997,7 @@ const MAP_THEMES=[
   {floor:'#200808',wall:'#350a0a',wallTop:'#450c0c',wallAcc:'#600808',boss:'#250000',bg:'#0a0500',name:'마왕 성채'}, // 5: 화염 (빨강)
 ];
 function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
-const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
+var bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
 // ── 타일맵 오프스크린 캐시 ──────────────────────────
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
