@@ -87,6 +87,6 @@ function showEnding(won){
 //  메인 루프
 // ═══════════════════════════════════════════════════════
 let lastT=0, accumT=0;
-const FIXED_DT=1000/60; // 고정 60fps 업데이트
+var FIXED_DT=1000/60; // 고정 60fps 업데이트
 
 // ── 멀티 클라이언트 업데이트 (카메라·dash·fog) ────────
