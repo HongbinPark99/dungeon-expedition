@@ -185,7 +185,7 @@ function createRoom(roomName){
   const id='room_'+(nextRoomId++);
   const room={
     id,name:roomName||`방 ${nextRoomId-1}`,
-    players:{},monsters:{},bullets:[],bombs:[],
+    players:{},monsters:{},bullets:[],
     state:'waiting',hostId:null,
     stage:1,kills:0,totalKills:0,tick:0,
     bossSpawned:false,nextId:1,
@@ -246,52 +246,15 @@ function gameTick(room){
   for(const p of ps){
     if(!p.alive) continue;
     const inp=p.input||{};
-    // ── 대시 물리 (서버에서 직접 처리) ──
-    if(p.dashFrames>0){
-      const nx=p.x+p.dashVx, ny=p.y+p.dashVy;
-      if(!isWall(room,nx,p.y)) p.x=nx;
-      if(!isWall(room,p.x,ny)) p.y=ny;
-      p.dashVx*=0.85; p.dashVy*=0.85;
-      p.dashFrames--;
-    } else {
-      // 일반 이동
-      let dx=0,dy=0;
-      if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
-      if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
-      if(dx&&dy){dx*=0.707;dy*=0.707;}
-      if(!isWall(room,p.x+dx,p.y))p.x+=dx;
-      if(!isWall(room,p.x,p.y+dy))p.y+=dy;
-    }
+    let dx=0,dy=0;
+    if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
+    if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
+    if(dx&&dy){dx*=0.707;dy*=0.707;}
+    if(!isWall(room,p.x+dx,p.y))p.x+=dx;
+    if(!isWall(room,p.x,p.y+dy))p.y+=dy;
     if(p.iframes>0)p.iframes--;
     if(p.shieldActive>0)p.shieldActive--;
-    if(p.dashCd>0)p.dashCd--;
-    if(!p.alive&&p.ghostTimer>0)p.ghostTimer--;
   }
-
-  // ── 폭탄 업데이트 ──
-  if(!room.bombs) room.bombs=[];
-  room.bombs=room.bombs.filter(b=>{
-    if(b.exploded){
-      b.explodeTimer++;
-      b.radius=b.maxRadius*(b.explodeTimer/20);
-      if(b.explodeTimer===5){
-        // 폭발 범위 피해
-        for(const p of Object.values(room.players)){
-          if(!p.alive||p.iframes>0||p.shieldActive>0) continue;
-          if(dist(b,p)<b.maxRadius){ p.hp-=80; p.iframes=60; if(p.hp<=0){p.hp=0;p.alive=false;p.ghostTimer=3600;} }
-        }
-        for(const m of Object.values(room.monsters)){
-          if(!m.alive) continue;
-          if(dist(b,m)<b.maxRadius){ m.hp-=80; if(m.hp<=0){m.alive=false;room.kills++;} }
-        }
-      }
-      return b.explodeTimer<20;
-    } else {
-      b.x+=b.vx; b.y+=b.vy; b.dist+=5;
-      if(b.dist>b.maxDist||isWall(room,b.x,b.y)){ b.exploded=true; return true; }
-      return true;
-    }
-  });
 
   room.bullets=room.bullets.filter(b=>{
     b.x+=Math.cos(b.angle)*b.speed;b.y+=Math.sin(b.angle)*b.speed;b.life--;
@@ -299,7 +262,7 @@ function gameTick(room){
     if(b.isMob){
       for(const p of ps){
         if(!p.alive||p.iframes>0||p.shieldActive>0)continue;
-        if(dist(b,p)<18){p.hp-=b.dmg;p.iframes=60;if(p.hp<=0){p.hp=0;p.alive=false;p.ghostTimer=3600;}return false;}
+        if(dist(b,p)<18){p.hp-=b.dmg;p.iframes=60;if(p.hp<=0){p.hp=0;p.alive=false;}return false;}
       }
     } else {
       for(const m of Object.values(room.monsters)){
@@ -347,7 +310,7 @@ function gameTick(room){
       if(m.range>150){
         room.bullets.push({x:m.x,y:m.y,angle:ang,speed:5,dmg:m.atk,life:80,isMob:true,col:'#f44'});
       } else if(minD<m.size+28&&target.iframes===0&&target.shieldActive===0){
-        target.hp-=m.atk;target.iframes=50;if(target.hp<=0){target.hp=0;target.alive=false;target.ghostTimer=3600;}
+        target.hp-=m.atk;target.iframes=50;if(target.hp<=0){target.hp=0;target.alive=false;}
       }
     }
   }
@@ -370,13 +333,11 @@ function gameTick(room){
     type:'state',
     players:ps.map(p=>({id:p.id,name:p.name,x:p.x,y:p.y,hp:p.hp,maxHp:p.maxHp,
       alive:p.alive,iframes:p.iframes,shieldActive:p.shieldActive,
-      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0',
-      dashFrames:p.dashFrames||0, ghostTimer:p.ghostTimer||0})),
+      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0'})),
     monsters:Object.values(room.monsters).filter(m=>m.alive).map(m=>({
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
     bullets:room.bullets.map(b=>({x:b.x,y:b.y,angle:b.angle,isMob:b.isMob,col:b.col||'#f44'})),
-    bombs:(room.bombs||[]).map(b=>({x:b.x,y:b.y,exploded:b.exploded,explodeTimer:b.explodeTimer||0,radius:b.radius||0,maxRadius:b.maxRadius})),
     items:(room.items||[]).map(it=>({id:it.id,x:it.x,y:it.y,type:it.type,pulse:it.pulse||0})),
     stage:room.stage,kills:room.kills,totalKills:room.totalKills,tick:room.tick,
     bossSpawned:room.bossSpawned,
@@ -458,28 +419,6 @@ wss.on('connection',ws=>{
     if(playerRoom.state!=='playing')return;
     if(msg.type==='ping'){return;}
     if(msg.type==='input'){player.input=msg.input;if(typeof msg.input?.mouseAngle==='number')player.facing=msg.input.mouseAngle;return;}
-    if(msg.type==='revive_hold'){
-      // 다른 플레이어 부활 시도 - 1.5초 홀드 후 완료
-      const target=room.players[msg.targetPid];
-      if(!target||target.alive) return;
-      const d=Math.hypot(player.x-target.x, player.y-target.y);
-      if(d>80) return;
-      if(!room._reviveProgress) room._reviveProgress={};
-      const key=pid+'->'+msg.targetPid;
-      if(!room._reviveProgress[key]) room._reviveProgress[key]=0;
-      room._reviveProgress[key]++;
-      broadcastRoom(room,{type:'revive_progress',pid:msg.targetPid,pct:room._reviveProgress[key]/90});
-      if(room._reviveProgress[key]>=90){ // 1.5초(60fps*1.5)
-        target.alive=true; target.hp=Math.round(target.maxHp*0.5);
-        target.iframes=120; target.ghostTimer=0;
-        room._reviveProgress[key]=0;
-        broadcastRoom(room,{type:'revived',pid:msg.targetPid});
-      }
-      return;
-    }
-    if(msg.type==='revive_cancel'){
-      if(room._reviveProgress) room._reviveProgress={}; return;
-    }
     if(msg.type==='pickup'){
       const it=playerRoom.items&&playerRoom.items.find(i=>i.id===msg.itemId);
       if(!it){return;}
@@ -499,24 +438,9 @@ wss.on('connection',ws=>{
       broadcastRoom(playerRoom,{type:'attack_fx',x:player.x,y:player.y,pid});return;
     }
     if(msg.type==='bomb'&&player.alive){
-      if(!playerRoom.bombs) playerRoom.bombs=[];
-      const ang=msg.facing!==undefined?msg.facing:(player.facing||0);
-      playerRoom.bombs.push({
-        x:player.x, y:player.y,
-        vx:Math.cos(ang)*5, vy:Math.sin(ang)*5,
-        dist:0, maxDist:200,
-        exploded:false, explodeTimer:0,
-        radius:0, maxRadius:90,
-      });
-      return;
+      for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
     }
     if(msg.type==='dash'&&player.alive){
-      if((player.dashCd||0)>0) return; // 쿨다운 중
-      const dashAngle=(typeof msg.angle==='number')?msg.angle:(player.facing||0);
-      player.dashVx=Math.cos(dashAngle)*9.5;
-      player.dashVy=Math.sin(dashAngle)*9.5;
-      player.dashFrames=12;
-      player.dashCd=180;
       player.iframes=14;
       broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
       return;
