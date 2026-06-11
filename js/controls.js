@@ -200,7 +200,7 @@ function updateMobileSkillHUD(){
 // ══════════════════════════════════════════════════════
 //  캐릭터 선택 시스템
 // ══════════════════════════════════════════════════════
-const CHAR_LIST = [
+var CHAR_LIST = [
   { id:'photo0', name:'자는 남자', desc:'🛡 HP +30% / 속도 -10%',  color:'#88aaff',
     passive:{ hpMul:1.3, spdMul:0.9, cdMul:1.0, atkMul:1.0, dashCdMul:1.0, label:'탱커' } },
   { id:'photo1', name:'부산 남자', desc:'⚡ 속도 +25% / ATK -10%', color:'#44dd88',
