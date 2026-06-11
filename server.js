@@ -185,7 +185,7 @@ function createRoom(roomName){
   const id='room_'+(nextRoomId++);
   const room={
     id,name:roomName||`방 ${nextRoomId-1}`,
-    players:{},monsters:{},bullets:[],
+    players:{},monsters:{},bullets:[],bombs:[],
     state:'waiting',hostId:null,
     stage:1,kills:0,totalKills:0,tick:0,
     bossSpawned:false,nextId:1,
@@ -246,15 +246,51 @@ function gameTick(room){
   for(const p of ps){
     if(!p.alive) continue;
     const inp=p.input||{};
-    let dx=0,dy=0;
-    if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
-    if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
-    if(dx&&dy){dx*=0.707;dy*=0.707;}
-    if(!isWall(room,p.x+dx,p.y))p.x+=dx;
-    if(!isWall(room,p.x,p.y+dy))p.y+=dy;
+    // ── 대시 물리 (서버에서 직접 처리) ──
+    if(p.dashFrames>0){
+      const nx=p.x+p.dashVx, ny=p.y+p.dashVy;
+      if(!isWall(room,nx,p.y)) p.x=nx;
+      if(!isWall(room,p.x,ny)) p.y=ny;
+      p.dashVx*=0.85; p.dashVy*=0.85;
+      p.dashFrames--;
+    } else {
+      // 일반 이동
+      let dx=0,dy=0;
+      if(inp.up)dy-=3.2;if(inp.down)dy+=3.2;
+      if(inp.left)dx-=3.2;if(inp.right)dx+=3.2;
+      if(dx&&dy){dx*=0.707;dy*=0.707;}
+      if(!isWall(room,p.x+dx,p.y))p.x+=dx;
+      if(!isWall(room,p.x,p.y+dy))p.y+=dy;
+    }
     if(p.iframes>0)p.iframes--;
     if(p.shieldActive>0)p.shieldActive--;
+    if(p.dashCd>0)p.dashCd--;
   }
+
+  // ── 폭탄 업데이트 ──
+  if(!room.bombs) room.bombs=[];
+  room.bombs=room.bombs.filter(b=>{
+    if(b.exploded){
+      b.explodeTimer++;
+      b.radius=b.maxRadius*(b.explodeTimer/20);
+      if(b.explodeTimer===5){
+        // 폭발 범위 피해
+        for(const p of Object.values(room.players)){
+          if(!p.alive||p.iframes>0||p.shieldActive>0) continue;
+          if(dist(b,p)<b.maxRadius){ p.hp-=80; p.iframes=60; if(p.hp<=0){p.hp=0;p.alive=false;} }
+        }
+        for(const m of Object.values(room.monsters)){
+          if(!m.alive) continue;
+          if(dist(b,m)<b.maxRadius){ m.hp-=80; if(m.hp<=0){m.alive=false;room.kills++;} }
+        }
+      }
+      return b.explodeTimer<20;
+    } else {
+      b.x+=b.vx; b.y+=b.vy; b.dist+=5;
+      if(b.dist>b.maxDist||isWall(room,b.x,b.y)){ b.exploded=true; return true; }
+      return true;
+    }
+  });
 
   room.bullets=room.bullets.filter(b=>{
     b.x+=Math.cos(b.angle)*b.speed;b.y+=Math.sin(b.angle)*b.speed;b.life--;
@@ -333,11 +369,13 @@ function gameTick(room){
     type:'state',
     players:ps.map(p=>({id:p.id,name:p.name,x:p.x,y:p.y,hp:p.hp,maxHp:p.maxHp,
       alive:p.alive,iframes:p.iframes,shieldActive:p.shieldActive,
-      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0'})),
+      facing:p.facing,colorIdx:p.colorIdx,score:p.score,charId:p.charId||'photo0',
+      dashFrames:p.dashFrames||0})),
     monsters:Object.values(room.monsters).filter(m=>m.alive).map(m=>({
       id:m.id,type:m.type,x:m.x,y:m.y,hp:m.hp,maxHp:m.maxHp,
       alive:m.alive,size:m.size,enraged:m.enraged,label:m.label})),
     bullets:room.bullets.map(b=>({x:b.x,y:b.y,angle:b.angle,isMob:b.isMob,col:b.col||'#f44'})),
+    bombs:(room.bombs||[]).map(b=>({x:b.x,y:b.y,exploded:b.exploded,explodeTimer:b.explodeTimer||0,radius:b.radius||0,maxRadius:b.maxRadius})),
     items:(room.items||[]).map(it=>({id:it.id,x:it.x,y:it.y,type:it.type,pulse:it.pulse||0})),
     stage:room.stage,kills:room.kills,totalKills:room.totalKills,tick:room.tick,
     bossSpawned:room.bossSpawned,
@@ -438,9 +476,24 @@ wss.on('connection',ws=>{
       broadcastRoom(playerRoom,{type:'attack_fx',x:player.x,y:player.y,pid});return;
     }
     if(msg.type==='bomb'&&player.alive){
-      for(let i=0;i<8;i++)playerRoom.bullets.push({x:player.x,y:player.y,angle:i*Math.PI/4,speed:7,dmg:50,life:50,isMob:false,pid});return;
+      if(!playerRoom.bombs) playerRoom.bombs=[];
+      const ang=msg.facing!==undefined?msg.facing:(player.facing||0);
+      playerRoom.bombs.push({
+        x:player.x, y:player.y,
+        vx:Math.cos(ang)*5, vy:Math.sin(ang)*5,
+        dist:0, maxDist:200,
+        exploded:false, explodeTimer:0,
+        radius:0, maxRadius:90,
+      });
+      return;
     }
     if(msg.type==='dash'&&player.alive){
+      if((player.dashCd||0)>0) return; // 쿨다운 중
+      const dashAngle=(typeof msg.angle==='number')?msg.angle:(player.facing||0);
+      player.dashVx=Math.cos(dashAngle)*9.5;
+      player.dashVy=Math.sin(dashAngle)*9.5;
+      player.dashFrames=12;
+      player.dashCd=180;
       player.iframes=14;
       broadcastRoom(playerRoom,{type:'dash_fx',pid,x:player.x,y:player.y,facing:player.facing});
       return;
