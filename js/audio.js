@@ -186,5 +186,5 @@ let isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let mobileActive = false;
 
 // 조이스틱 상태
-const joyState = { dx:0, dy:0, active:false, id:-1 };
-const aimState  = { x:0, y:0, active:false, id:-1 };
+var joyState = { dx:0, dy:0, active:false, id:-1 };
+var aimState  = { x:0, y:0, active:false, id:-1 };
