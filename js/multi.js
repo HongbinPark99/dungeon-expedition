@@ -430,7 +430,7 @@ document.getElementById('waiting-leave-btn').addEventListener('click',()=>{
 });
 
 // ── 멀티 입력 전송 ────────────────────────────────────
-let lastMultiInput={up:false,down:false,left:false,right:false};
+var lastMultiInput={up:false,down:false,left:false,right:false};
 setInterval(()=>{
   if(!multiMode||!multiWs||multiWs.readyState!==1) return;
   const inp=buildInput();
@@ -506,11 +506,11 @@ function updateMultiHUD(players){
 // 멀티 키 입력은 doAttack/doSkill 함수에서 처리
 
 // ── 멀티 렌더링 — update/draw 함수 분기 ──────────────
-const _origUpdate=update;
-const _origDraw=draw;
+var _origUpdate=update;
+var _origDraw=draw;
 
 // update/draw 를 멀티 모드일 때 서버 상태로 대체
-const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
+var PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 // ── 멀티: 다른 플레이어 오버레이 ─────────────────────
 function multiDrawPlayers(){
   if(!multiState||!Array.isArray(multiState.players)) return;
