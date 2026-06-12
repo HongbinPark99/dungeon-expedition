@@ -773,7 +773,7 @@ function update(){
   attackFx.length=ai;
 
   // ── 시야 업데이트 (4프레임마다) ───────────────────
-  if(tick%4===0) updateFog();
+  if(tick%2===0) updateFog();
 
   // ── 카메라 (싱글+멀티 공통) ──────────────────────
   if(player){
@@ -894,7 +894,7 @@ function update(){
 
 // ── Fog ─────────────────────────────────────────────
 function updateFog(){
-  if(!player.alive) return;
+  if(!player||!player.alive) return;
   const r=Math.ceil(SIGHT_R/TILE)+1;
   const cx=player.x/TILE|0, cy=player.y/TILE|0;
   for(let dy=-r;dy<=r;dy++){
