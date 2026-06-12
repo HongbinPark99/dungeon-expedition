@@ -911,13 +911,8 @@ function updateFog(){
 // ═══════════════════════════════════════════════════════
 // 타일 색상
 // 스테이지별 맵 테마
-const MAP_THEMES=[
-  {floor:'#111228',wall:'#1e2040',wallTop:'#252848',wallAcc:'#2a305a',boss:'#1e0808',bg:'#050810',name:'던전'},      // 1: 클래식 던전 (청색)
-  {floor:'#1a0820',wall:'#2a0835',wallTop:'#380a45',wallAcc:'#4a1060',boss:'#200010',bg:'#080510',name:'암흑 미로'}, // 2: 암흑 (보라)
-  {floor:'#081818',wall:'#0d2828',wallTop:'#103535',wallAcc:'#155050',boss:'#081a20',bg:'#050a08',name:'빙하 동굴'}, // 3: 빙하 (청록)
-  {floor:'#181808',wall:'#282808',wallTop:'#353510',wallAcc:'#504810',boss:'#1a1800',bg:'#080808',name:'사막 유적'}, // 4: 황토 (노랑)
-  {floor:'#200808',wall:'#350a0a',wallTop:'#450c0c',wallAcc:'#600808',boss:'#250000',bg:'#0a0500',name:'마왕 성채'}, // 5: 화염 (빨강)
-];
+// MAP_THEMES/getTheme: map.js에서 선언
+
 function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
 const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
