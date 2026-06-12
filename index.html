@@ -595,23 +595,23 @@ var myMultiId=null, myColorIdx=0;
 //  상수
 // ═══════════════════════════════════════════════════════
 // 스테이지별 맵 크기 (스테이지 올라갈수록 넓어짐)
-const BASE_MAP_W = 4000, BASE_MAP_H = 3200;
-let MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
-let COLS = MAP_W / 48 | 0;
-let ROWS = MAP_H / 48 | 0;
-const TILE = 48;
-let stage = 1;
-let totalKills = 0; // 전체 누적 킬
-const SIGHT_R = 480;
-const P_SPEED = 2.0;
-const P_HP    = 120;
-const P_ATK   = 32;
-const P_RANGE = 180;
-const P_CD    = 36;
-const IFRAMES = 48;
-const BULLET_SPEED = 10;
-const BULLET_LEN   = 24;
-const BULLET_RANGE = 360;
+var BASE_MAP_W = 4000, BASE_MAP_H = 3200;
+var MAP_W = BASE_MAP_W, MAP_H = BASE_MAP_H;
+var COLS = MAP_W / 48 | 0;
+var ROWS = MAP_H / 48 | 0;
+var TILE = 48;
+var stage = 1;
+var totalKills = 0; // 전체 누적 킬
+var SIGHT_R = 480;
+var P_SPEED = 2.0;
+var P_HP    = 120;
+var P_ATK   = 32;
+var P_RANGE = 180;
+var P_CD    = 36;
+var IFRAMES = 48;
+var BULLET_SPEED = 10;
+var BULLET_LEN   = 24;
+var BULLET_RANGE = 360;
 
 // ── 무기 정의 ──────────────────────────────────────────
 const WEAPONS = {
@@ -626,19 +626,19 @@ const WEAPONS = {
 };
 
 // 무기 드랍 풀 (sword 제외 — 기본 무기)
-const WEAPON_DROP_POOL = ['pistol','shotgun','rifle','smg','laser','cannon','twin'];
+var WEAPON_DROP_POOL = ['pistol','shotgun','rifle','smg','laser','cannon','twin'];
 // 스킬 쿨다운 (프레임)
-const CD_BOMB    = 360;  // Z: 폭탄 6초
-const CD_SHIELD  = 480;  // X: 방패 8초
-const CD_THUNDER = 300;  // C: 번개 5초
+var CD_BOMB    = 360;  // Z: 폭탄 6초
+var CD_SHIELD  = 480;  // X: 방패 8초
+var CD_THUNDER = 300;  // C: 번개 5초
 
 // ═══════════════════════════════════════════════════════
 //  캔버스
 // ═══════════════════════════════════════════════════════
-const canvas = document.getElementById('c');
-const ctx    = canvas.getContext('2d');
-const mmCv   = document.getElementById('mm');
-const mmCtx  = mmCv.getContext('2d');
+var canvas = document.getElementById('c');
+var ctx    = canvas.getContext('2d');
+var mmCv   = document.getElementById('mm');
+var mmCtx  = mmCv.getContext('2d');
 
 function resizeCanvas(){
   canvas.width  = window.innerWidth;
@@ -650,8 +650,8 @@ resizeCanvas();
 // ═══════════════════════════════════════════════════════
 //  맵 생성
 // ═══════════════════════════════════════════════════════
-let tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
-let explored;// Uint8Array COLS*ROWS  0/1
+var tiles;   // Uint8Array COLS*ROWS  0=floor 1=wall
+var explored;// Uint8Array COLS*ROWS  0/1
 
 function tileAt(c,r){
   if(c<0||c>=COLS||r<0||r>=ROWS) return 1;
