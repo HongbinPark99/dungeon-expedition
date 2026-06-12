@@ -536,7 +536,7 @@ function multiDrawPlayers(){
     ctx.shadowBlur=10;
     // 캐릭터 그리기 (charId 기반)
     const cid=p.charId||(window._charIdMap&&window._charIdMap[p.id])||'photo0';
-    const photoMap={player:'ferris_front',photo0:'photo0',photo1:'photo1',photo2:'photo2',photo3:'photo3',photo4:'photo4'};
+    const photoMap={player:'photo0',photo0:'photo0',photo1:'photo1',photo2:'photo2',photo3:'photo3',photo4:'photo4'};
     const key=photoMap[cid]||cid||'photo0';
     window._drawingPid=p.id;
     drawPhotoChar(ctx,key,sxp,syp,26,'#1a1a2a',blinking&&!p.alive);
