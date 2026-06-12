@@ -387,48 +387,6 @@ canvas{display:block;cursor:none;}
 </style>
 </head>
 <body>
-<div id="_dbg" style="display:none;position:fixed;top:0;left:0;right:0;z-index:999999;
-  background:rgba(0,0,0,0.92);color:#0f0;font-size:11px;font-family:monospace;
-  padding:8px;max-height:45vh;overflow-y:auto;word-break:break-all;white-space:pre-wrap;
-  border-bottom:2px solid #0f0;">
-<div style="color:#ff0;font-weight:bold;margin-bottom:4px;">
-  ⚠ 에러 로그 (탭하면 닫힘)
-</div></div>
-<script>
-(function(){
-  var el=document.getElementById('_dbg');
-  var logs=[];
-  el.addEventListener('click',function(){el.style.display='none';logs=[];});
-  function show(type,msg){
-    logs.unshift('['+type+'] '+msg);
-    if(logs.length>15) logs.pop();
-    el.children[0].textContent='⚠ 에러 로그 (탭하면 닫힘) ['+logs.length+']';
-    el.lastChild.textContent=logs.join('
-─
-');
-    el.style.display='block';
-  }
-  window.onerror=function(msg,src,line,col){
-    var file=(src||'').split('/').pop();
-    show('ERR',msg+'
-  '+file+':'+line+':'+col);
-    return false;
-  };
-  window.onunhandledrejection=function(e){
-    show('PROMISE',String(e.reason&&e.reason.stack||e.reason));
-  };
-  var _ce=console.error.bind(console);
-  console.error=function(){
-    var m=Array.from(arguments).map(function(a){return a&&a.stack?a.stack:String(a);}).join(' ');
-    show('LOG',m); _ce.apply(console,arguments);
-  };
-  var _cw=console.warn.bind(console);
-  console.warn=function(){
-    var m=Array.from(arguments).map(function(a){return String(a);}).join(' ');
-    show('WARN',m); _cw.apply(console,arguments);
-  };
-})();
-</script>
 
 
 <!-- 로비 -->
@@ -719,5 +677,37 @@ function rng(min,max){ return min+Math.random()*(max-min)|0; }
 <script src="js/ui-hud.js"></script>
 <script src="js/multi.js"></script>
 <script src="js/shop.js"></script>
+<div id="_dbg" style="display:none;position:fixed;top:0;left:0;right:0;z-index:999999;background:rgba(0,0,0,0.93);color:#0f0;font-size:11px;font-family:monospace;padding:8px;max-height:50vh;overflow-y:auto;word-break:break-all;white-space:pre-wrap;border-bottom:2px solid #0f0;"></div>
+<script>
+/* 모바일 에러 로그 오버레이 */
+(function(){
+  var el=document.getElementById('_dbg');
+  if(!el) return;
+  var logs=[];
+  el.addEventListener('click',function(){ el.style.display='none'; logs=[]; });
+  function show(type,msg){
+    var time=new Date().toTimeString().slice(0,8);
+    logs.unshift('['+time+']['+type+'] '+String(msg).slice(0,300));
+    if(logs.length>20) logs.pop();
+    el.textContent=logs.join('\n─────\n');
+    el.style.display='block';
+  }
+  window.onerror=function(msg,src,line,col){
+    show('ERR', msg+'\n  '+(src||'').split('/').pop()+':'+line);
+    return false;
+  };
+  window.onunhandledrejection=function(e){
+    show('REJECT', e.reason&&e.reason.stack||e.reason);
+  };
+  var _ce=console.error.bind(console);
+  console.error=function(){
+    show('ERR', Array.from(arguments).map(function(a){
+      return a&&a.stack?a.stack:String(a);
+    }).join(' '));
+    _ce.apply(console,arguments);
+  };
+  window._dbgLog=function(msg){ show('LOG',msg); };
+})();
+</script>
 </body>
 </html>
