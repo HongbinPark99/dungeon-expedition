@@ -913,7 +913,8 @@ function updateFog(){
 // 스테이지별 맵 테마
 // MAP_THEMES/getTheme: map.js에서 선언
 
-function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
+// getTheme: map.js에서 선언
+
 const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
 // ── 타일맵 오프스크린 캐시 ──────────────────────────
