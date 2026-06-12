@@ -80,6 +80,10 @@ function initGame(keepStage=false){
   document.getElementById('game').style.display='block';
   document.getElementById('ending').style.display='none';
 
+  // 초기 fog 업데이트 (첫 프레임 전에 플레이어 주변 탐험 표시)
+  updateFog();
+  _tilesDirty=true;
+
   if(!rafId) loop();
 }
 
