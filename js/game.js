@@ -246,10 +246,10 @@ function spawnBoss(){
 //  공격
 // ═══════════════════════════════════════════════════════
 // ── 구르기(대시) ──────────────────────────────────
-const DASH_SPEED = 18;    // 대시 속도
-const DASH_FRAMES = 20;   // 대시 지속 프레임
-const DASH_CD = 180;      // 대시 쿨다운 (3초)
-const DASH_IFRAMES = 20;  // 무적 프레임
+var DASH_SPEED = 18;    // 대시 속도
+var DASH_FRAMES = 20;   // 대시 지속 프레임
+var DASH_CD = 180;      // 대시 쿨다운 (3초)
+var DASH_IFRAMES = 20;  // 무적 프레임
 
 function doDash(){
   // 공통 조건 체크
@@ -410,7 +410,7 @@ const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_char
 // ═══════════════════════════════════════════════════════
 //  파티클
 // ═══════════════════════════════════════════════════════
-const MAX_PARTICLES=120;
+var MAX_PARTICLES=120;
 function spawnParticles(x,y,col,n=6){
   n=Math.min(n,6);
   if(particles.length>MAX_PARTICLES) return;
@@ -765,10 +765,10 @@ function update(){
   bullets.length=bi; } // end if(!multiMode) 폭탄/총알
 
   // ── 파티클 ───────────────────────────────────────
-  let pi=0;
+  var pi=0;
   for(let i=0;i<particles.length;i++){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.88;p.vy*=0.88;p.life--;if(p.life>0)particles[pi++]=p;}
   particles.length=pi;
-  let ai=0;
+  var ai=0;
   for(let i=0;i<attackFx.length;i++){attackFx[i].life--;if(attackFx[i].life>0)attackFx[ai++]=attackFx[i];}
   attackFx.length=ai;
 
@@ -786,7 +786,7 @@ function update(){
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
   if(tick%6===0) updateMobileSkillHUD();
-  const boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
+  var boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
   if(tick%6===0){
     const pct=Math.max(0,player.hp/player.maxHp*100);
     document.getElementById('hf0').style.width=pct+'%';
@@ -915,7 +915,7 @@ function updateFog(){
 
 // getTheme: map.js에서 선언
 
-const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
+var bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
 // ── 타일맵 오프스크린 캐시 ──────────────────────────
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
