@@ -333,13 +333,19 @@ function connectMultiWs(url, joinMsg){
         document.getElementById('boss-bar').style.display='block';
       }
 
-      // 카메라 (첫 state 시 즉시 점프)
+      // 카메라: 첫 state면 즉시 이동, 이후엔 update()의 lerp가 처리
       if(me && !window._multiCamInit){
         camX=me.x-canvas.width/2;
         camY=me.y-canvas.height/2;
         camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
         camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
         window._multiCamInit=true;
+      } else if(me){
+        // lerp로 부드럽게 추적 (update()와 별개로 보장)
+        const tx=me.x-canvas.width/2, ty=me.y-canvas.height/2;
+        camX+=(tx-camX)*0.15; camY+=(ty-camY)*0.15;
+        camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
+        camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
       }
 
       // fog 탐색 업데이트
@@ -433,12 +439,8 @@ document.getElementById('waiting-leave-btn').addEventListener('click',()=>{
 var lastMultiInput={up:false,down:false,left:false,right:false};
 setInterval(()=>{
   if(!multiMode||!multiWs||multiWs.readyState!==1) return;
-  const inp=buildInput();
-  if(JSON.stringify(inp)!==JSON.stringify(lastMultiInput)){
-    lastMultiInput=inp;
-    wsSend({type:'input',input:inp});
-  }
-},1000/60);
+  wsSend({type:'input',input:buildInput()}); // 항상 전송 (키 홀드 대응)
+},1000/20); // 20fps - 렉 방지
 
 // buildInput 함수
 function buildInput(){
