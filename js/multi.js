@@ -333,19 +333,13 @@ function connectMultiWs(url, joinMsg){
         document.getElementById('boss-bar').style.display='block';
       }
 
-      // 카메라: 첫 state면 즉시 이동, 이후엔 update()의 lerp가 처리
+      // 카메라 (첫 state 시 즉시 점프)
       if(me && !window._multiCamInit){
         camX=me.x-canvas.width/2;
         camY=me.y-canvas.height/2;
         camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
         camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
         window._multiCamInit=true;
-      } else if(me){
-        // lerp로 부드럽게 추적 (update()와 별개로 보장)
-        const tx=me.x-canvas.width/2, ty=me.y-canvas.height/2;
-        camX+=(tx-camX)*0.15; camY+=(ty-camY)*0.15;
-        camX=Math.max(0,Math.min(MAP_W-canvas.width,camX));
-        camY=Math.max(0,Math.min(MAP_H-canvas.height,camY));
       }
 
       // fog 탐색 업데이트
@@ -436,11 +430,15 @@ document.getElementById('waiting-leave-btn').addEventListener('click',()=>{
 });
 
 // ── 멀티 입력 전송 ────────────────────────────────────
-var lastMultiInput={up:false,down:false,left:false,right:false};
+let lastMultiInput={up:false,down:false,left:false,right:false};
 setInterval(()=>{
   if(!multiMode||!multiWs||multiWs.readyState!==1) return;
-  wsSend({type:'input',input:buildInput()}); // 항상 전송 (키 홀드 대응)
-},1000/20); // 20fps - 렉 방지
+  const inp=buildInput();
+  if(JSON.stringify(inp)!==JSON.stringify(lastMultiInput)){
+    lastMultiInput=inp;
+    wsSend({type:'input',input:inp});
+  }
+},1000/60);
 
 // buildInput 함수
 function buildInput(){
@@ -508,11 +506,11 @@ function updateMultiHUD(players){
 // 멀티 키 입력은 doAttack/doSkill 함수에서 처리
 
 // ── 멀티 렌더링 — update/draw 함수 분기 ──────────────
-var _origUpdate=update;
-var _origDraw=draw;
+const _origUpdate=update;
+const _origDraw=draw;
 
 // update/draw 를 멀티 모드일 때 서버 상태로 대체
-var PCOLORS=['#44aaff','#ff8844','#aa44ff'];
+const PCOLORS=['#44aaff','#ff8844','#aa44ff'];
 // ── 멀티: 다른 플레이어 오버레이 ─────────────────────
 function multiDrawPlayers(){
   if(!multiState||!Array.isArray(multiState.players)) return;
@@ -538,7 +536,7 @@ function multiDrawPlayers(){
     ctx.shadowBlur=10;
     // 캐릭터 그리기 (charId 기반)
     const cid=p.charId||(window._charIdMap&&window._charIdMap[p.id])||'photo0';
-    const photoMap={player:'photo0',photo0:'photo0',photo1:'photo1',photo2:'photo2',photo3:'photo3',photo4:'photo4'};
+    const photoMap={player:'ferris_front',photo0:'photo0',photo1:'photo1',photo2:'photo2',photo3:'photo3',photo4:'photo4'};
     const key=photoMap[cid]||cid||'photo0';
     window._drawingPid=p.id;
     drawPhotoChar(ctx,key,sxp,syp,26,'#1a1a2a',blinking&&!p.alive);
