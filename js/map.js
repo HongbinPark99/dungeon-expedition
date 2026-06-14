@@ -153,35 +153,26 @@ function moveSlide(ox,oy,nx,ny,r=13){
 // ═══════════════════════════════════════════════════════
 //  게임 상태
 // ═══════════════════════════════════════════════════════
-var player, monsters=[], particles=[], attackFx=[];
-var camX=0, camY=0;
-var kills=0, tick=0, gold=0;
-var bullets=[], bombs=[], dangerZonesFx=[], items=[];
-var skillCd={bomb:0, shield:0, thunder:0};
-var shieldActive=0;
-var bossArena=null, bossSpawned=false, bossDefeated=false;
-var gameRunning=false, gameWon=false, gameOver=false;
-var screenShake=0;
-var spawnTimer=0;
-var logEntries=[];
-var selectedChar='photo0'; // 선택된 캐릭터 ID
-var _shopNextStage=1;
-var alertTimer=0;
-var mouseAttacking=false;
-var _exploredVersion=0, _lastExploredVersion=-1;
-var nextId=1; // 아이템 ID 생성용
+let player, monsters=[], particles=[], attackFx=[];
+let camX=0, camY=0;
+let kills=0, tick=0, gold=0;
+let bullets=[], bombs=[], dangerZonesFx=[], items=[];
+let skillCd={bomb:0, shield:0, thunder:0};
+let shieldActive=0;
+let bossArena=null, bossSpawned=false, bossDefeated=false;
+let gameRunning=false, gameWon=false, gameOver=false;
+let screenShake=0;
+let spawnTimer=0;
+let logEntries=[];
+let selectedChar='photo0'; // 선택된 캐릭터 ID
+let _shopNextStage=1;
+let alertTimer=0;
+let mouseAttacking=false;
+let _exploredVersion=0, _lastExploredVersion=-1;
+let nextId=1; // 아이템 ID 생성용
 
 
 // ═══════════════════════════════════════════════════════
 //  효과음 시스템 — Web Audio API 합성음
 // ═══════════════════════════════════════════════════════
-var _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
-
-var MAP_THEMES=[
-  {floor:'#111228',wall:'#1e2040',wallTop:'#252848',wallAcc:'#2a305a',boss:'#1e0808',bg:'#050810',name:'던전'},      // 1: 클래식 던전 (청색)
-  {floor:'#1a0820',wall:'#2a0835',wallTop:'#380a45',wallAcc:'#4a1060',boss:'#200010',bg:'#080510',name:'암흑 미로'}, // 2: 암흑 (보라)
-  {floor:'#081818',wall:'#0d2828',wallTop:'#103535',wallAcc:'#155050',boss:'#081a20',bg:'#050a08',name:'빙하 동굴'}, // 3: 빙하 (청록)
-  {floor:'#181808',wall:'#282808',wallTop:'#353510',wallAcc:'#504810',boss:'#1a1800',bg:'#080808',name:'사막 유적'}, // 4: 황토 (노랑)
-  {floor:'#200808',wall:'#350a0a',wallTop:'#450c0c',wallAcc:'#600808',boss:'#250000',bg:'#0a0500',name:'마왕 성채'}, // 5: 화염 (빨강)
-];
-function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
+let _audioCtx=null,_sfxMuted=false,_bgmGain=null,_bgmOscs=[];
