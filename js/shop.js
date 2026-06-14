@@ -8,7 +8,7 @@ function getShopItems(stg){
   const consumables=pool.filter(i=>i.type==='consumable').sort(()=>Math.random()-.5).slice(0,4);
   return [...consumables,...upgrades,...weapons];
 }
-var SHOP_ITEMS = [
+const SHOP_ITEMS = [
   // 소비 아이템
   { id:'hp30',      name:'소형 포션',    emoji:'🧪', desc:'HP +30 회복',       cost:15,  type:'consumable', tier:1 },
   { id:'hp60',      name:'대형 포션',    emoji:'❤️', desc:'HP +60 회복',       cost:28,  type:'consumable', tier:1 },
@@ -124,7 +124,7 @@ function buyShopItem(itemId){
   showShop(_shopNextStage);
 }
 
-var _shopCloseBtn=document.getElementById('shop-close-btn');
+const _shopCloseBtn=document.getElementById('shop-close-btn');
 if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
   document.getElementById('shop-screen').style.display='none';
   stage=_shopNextStage;
@@ -132,7 +132,7 @@ if(_shopCloseBtn) _shopCloseBtn.addEventListener('click',()=>{
   initGame(true);
 });
 // 건너뛰기 버튼 (상점 생략하고 바로 다음 스테이지)
-var _shopSkipBtn=document.getElementById('shop-skip-btn');
+const _shopSkipBtn=document.getElementById('shop-skip-btn');
 if(_shopSkipBtn) _shopSkipBtn.addEventListener('click',()=>{
   document.getElementById('shop-screen').style.display='none';
   stage=_shopNextStage;
