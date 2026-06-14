@@ -80,10 +80,6 @@ function initGame(keepStage=false){
   document.getElementById('game').style.display='block';
   document.getElementById('ending').style.display='none';
 
-  // 초기 fog 업데이트 (첫 프레임 전에 플레이어 주변 탐험 표시)
-  updateFog();
-  _tilesDirty=true;
-
   if(!rafId) loop();
 }
 
@@ -250,10 +246,10 @@ function spawnBoss(){
 //  공격
 // ═══════════════════════════════════════════════════════
 // ── 구르기(대시) ──────────────────────────────────
-var DASH_SPEED = 18;    // 대시 속도
-var DASH_FRAMES = 20;   // 대시 지속 프레임
-var DASH_CD = 180;      // 대시 쿨다운 (3초)
-var DASH_IFRAMES = 20;  // 무적 프레임
+const DASH_SPEED = 18;    // 대시 속도
+const DASH_FRAMES = 20;   // 대시 지속 프레임
+const DASH_CD = 180;      // 대시 쿨다운 (3초)
+const DASH_IFRAMES = 20;  // 무적 프레임
 
 function doDash(){
   // 공통 조건 체크
@@ -414,7 +410,7 @@ const ITEM_COL  ={hp:'#f44',bomb_charge:'#fa0',shield_charge:'#4af',thunder_char
 // ═══════════════════════════════════════════════════════
 //  파티클
 // ═══════════════════════════════════════════════════════
-var MAX_PARTICLES=120;
+const MAX_PARTICLES=120;
 function spawnParticles(x,y,col,n=6){
   n=Math.min(n,6);
   if(particles.length>MAX_PARTICLES) return;
@@ -694,12 +690,12 @@ function update(){
   if(player.speedBoost>0) player.speedBoost--;
 
   // ── 폭탄/총알 (싱글만 - 멀티는 서버처리) ────────
-  // ── 폭탄 (싱글만) ──────────────────────────────────
   if(!multiMode){ bombs.forEach(b=>{
     if(b.exploded){
       b.explodeTimer++;
       b.radius=b.maxRadius*(b.explodeTimer/20);
       if(b.explodeTimer>=20){ b.alive=false; return; }
+      // 폭발 피해
       if(b.explodeTimer===5){
         monsters.forEach(m=>{
           if(!m.alive) return;
@@ -717,13 +713,12 @@ function update(){
       if(b.dist>b.maxDist||isWall(b.x,b.y)) b.exploded=true;
     }
   });
-  bombs=bombs.filter(b=>b.alive); }
-
-  // ── dangerZonesFx (싱글/멀티 공통) ─────────────
+  bombs=bombs.filter(b=>b.alive);
+  // dangerZonesFx life 감소 (gameRunning 상관없이 항상 실행)
   dangerZonesFx.forEach(d=>d.life--);
   dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
 
-  // ── 총알 업데이트 (싱글/멀티 공통) ─────────────
+  // ── 총알 업데이트 ────────────────────────────────
   bullets.forEach(b=>{
     if(!b.alive) return;
     const spd=Math.hypot(b.vx,b.vy);
@@ -767,18 +762,18 @@ function update(){
   if(bullets.length>80)bullets.splice(0,bullets.length-80);
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
-  bullets.length=bi; // 총알 filter (싱글/멀티 공통)
+  bullets.length=bi; } // end if(!multiMode) 폭탄/총알
 
   // ── 파티클 ───────────────────────────────────────
-  var pi=0;
+  let pi=0;
   for(let i=0;i<particles.length;i++){const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vx*=0.88;p.vy*=0.88;p.life--;if(p.life>0)particles[pi++]=p;}
   particles.length=pi;
-  var ai=0;
+  let ai=0;
   for(let i=0;i<attackFx.length;i++){attackFx[i].life--;if(attackFx[i].life>0)attackFx[ai++]=attackFx[i];}
   attackFx.length=ai;
 
   // ── 시야 업데이트 (4프레임마다) ───────────────────
-  if(tick%2===0) updateFog();
+  if(tick%4===0) updateFog();
 
   // ── 카메라 (싱글+멀티 공통) ──────────────────────
   if(player){
@@ -791,7 +786,7 @@ function update(){
 
   // ── HUD (6프레임마다 DOM 업데이트) ─────────────────
   if(tick%6===0) updateMobileSkillHUD();
-  var boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
+  const boss=monsters.find(m=>m.type&&m.type.startsWith('boss')&&m.alive);
   if(tick%6===0){
     const pct=Math.max(0,player.hp/player.maxHp*100);
     document.getElementById('hf0').style.width=pct+'%';
@@ -899,7 +894,7 @@ function update(){
 
 // ── Fog ─────────────────────────────────────────────
 function updateFog(){
-  if(!player||!player.alive) return;
+  if(!player.alive) return;
   const r=Math.ceil(SIGHT_R/TILE)+1;
   const cx=player.x/TILE|0, cy=player.y/TILE|0;
   for(let dy=-r;dy<=r;dy++){
@@ -916,11 +911,15 @@ function updateFog(){
 // ═══════════════════════════════════════════════════════
 // 타일 색상
 // 스테이지별 맵 테마
-// MAP_THEMES/getTheme: map.js에서 선언
-
-// getTheme: map.js에서 선언
-
-var bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
+const MAP_THEMES=[
+  {floor:'#111228',wall:'#1e2040',wallTop:'#252848',wallAcc:'#2a305a',boss:'#1e0808',bg:'#050810',name:'던전'},      // 1: 클래식 던전 (청색)
+  {floor:'#1a0820',wall:'#2a0835',wallTop:'#380a45',wallAcc:'#4a1060',boss:'#200010',bg:'#080510',name:'암흑 미로'}, // 2: 암흑 (보라)
+  {floor:'#081818',wall:'#0d2828',wallTop:'#103535',wallAcc:'#155050',boss:'#081a20',bg:'#050a08',name:'빙하 동굴'}, // 3: 빙하 (청록)
+  {floor:'#181808',wall:'#282808',wallTop:'#353510',wallAcc:'#504810',boss:'#1a1800',bg:'#080808',name:'사막 유적'}, // 4: 황토 (노랑)
+  {floor:'#200808',wall:'#350a0a',wallTop:'#450c0c',wallAcc:'#600808',boss:'#250000',bg:'#0a0500',name:'마왕 성채'}, // 5: 화염 (빨강)
+];
+function getTheme(){ return MAP_THEMES[Math.min(stage-1,MAP_THEMES.length-1)]; }
+const bossFloor='#1e0808', dimFloor='#0a0a18', dimWall='#0d0e1e';
 
 // ── 타일맵 오프스크린 캐시 ──────────────────────────
 // 맵 전체를 하나의 큰 오프스크린 캔버스에 그려두고
