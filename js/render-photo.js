@@ -17,7 +17,7 @@ const PHOTO_B64 = {
 };
 
 // 사진 Image 객체 캐시 (비동기 로드)
-var PHOTO_IMGS = {};
+const PHOTO_IMGS = {};
 function loadPhotos(){
   Object.entries(PHOTO_B64).forEach(([k,v])=>{
     const img = new Image();
@@ -132,9 +132,9 @@ function drawPhotoMonster(c, photoKey, cx, cy, sz, bodyColor, enraged, warnPhase
   c.restore();
 }
 
-var keys={};
+const keys={};
 // ── 마우스 조준 ───────────────────────────────────────
-var mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
+const mouse={x:0, y:0}; // 캔버스 내 마우스 좌표
 
 canvas.addEventListener('mousemove',e=>{
   const rect=canvas.getBoundingClientRect();
