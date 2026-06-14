@@ -200,7 +200,7 @@ function updateMobileSkillHUD(){
 // ══════════════════════════════════════════════════════
 //  캐릭터 선택 시스템
 // ══════════════════════════════════════════════════════
-var CHAR_LIST = [
+const CHAR_LIST = [
   { id:'photo0', name:'자는 남자', desc:'숙면 전사',   color:'#88aaff' },
   { id:'photo1', name:'부산 남자', desc:'해양대 용사', color:'#44dd88' },
   { id:'photo2', name:'안경 남자', desc:'뿜뿜 마법사', color:'#ffaa44' },
