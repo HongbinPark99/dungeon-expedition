@@ -694,12 +694,12 @@ function update(){
   if(player.speedBoost>0) player.speedBoost--;
 
   // ── 폭탄/총알 (싱글만 - 멀티는 서버처리) ────────
+  // ── 폭탄 (싱글만) ──────────────────────────────────
   if(!multiMode){ bombs.forEach(b=>{
     if(b.exploded){
       b.explodeTimer++;
       b.radius=b.maxRadius*(b.explodeTimer/20);
       if(b.explodeTimer>=20){ b.alive=false; return; }
-      // 폭발 피해
       if(b.explodeTimer===5){
         monsters.forEach(m=>{
           if(!m.alive) return;
@@ -717,12 +717,13 @@ function update(){
       if(b.dist>b.maxDist||isWall(b.x,b.y)) b.exploded=true;
     }
   });
-  bombs=bombs.filter(b=>b.alive);
-  // dangerZonesFx life 감소 (gameRunning 상관없이 항상 실행)
+  bombs=bombs.filter(b=>b.alive); }
+
+  // ── dangerZonesFx (싱글/멀티 공통) ─────────────
   dangerZonesFx.forEach(d=>d.life--);
   dangerZonesFx=dangerZonesFx.filter(d=>d.life>0);
 
-  // ── 총알 업데이트 ────────────────────────────────
+  // ── 총알 업데이트 (싱글/멀티 공통) ─────────────
   bullets.forEach(b=>{
     if(!b.alive) return;
     const spd=Math.hypot(b.vx,b.vy);
@@ -766,7 +767,7 @@ function update(){
   if(bullets.length>80)bullets.splice(0,bullets.length-80);
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
-  bullets.length=bi; } // end if(!multiMode) 폭탄/총알
+  bullets.length=bi; // 총알 filter (싱글/멀티 공통)
 
   // ── 파티클 ───────────────────────────────────────
   var pi=0;
