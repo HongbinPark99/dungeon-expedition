@@ -687,7 +687,7 @@ function rng(min,max){ return min+Math.random()*(max-min)|0; }
   el.addEventListener('click',function(){ el.style.display='none'; logs=[]; });
   function show(type,msg){
     var time=new Date().toTimeString().slice(0,8);
-    logs.unshift('['+time+']['+type+'] '+String(msg).slice(0,300));
+    logs.unshift('['+time+']['+type+'] '+String(msg).slice(0,400));
     if(logs.length>20) logs.pop();
     el.textContent=logs.join('\n─────\n');
     el.style.display='block';
@@ -706,8 +706,16 @@ function rng(min,max){ return min+Math.random()*(max-min)|0; }
     }).join(' '));
     _ce.apply(console,arguments);
   };
+  var _cw=console.warn.bind(console);
+  console.warn=function(){
+    show('WARN', Array.from(arguments).map(function(a){
+      return a&&a.stack?a.stack:String(a);
+    }).join(' '));
+    _cw.apply(console,arguments);
+  };
   window._dbgLog=function(msg){ show('LOG',msg); };
 })();
 </script>
+
 </body>
 </html>
