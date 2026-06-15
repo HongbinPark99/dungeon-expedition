@@ -764,7 +764,7 @@ function update(){
   if(bullets.length>80)bullets.splice(0,bullets.length-80);
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
-  bullets.length=bi; } // end if(!multiMode) 폭탄/총알
+  bullets.length=bi;
 
   // ── 파티클 ───────────────────────────────────────
   let pi=0;
