@@ -316,7 +316,7 @@ function connectMultiWs(url, joinMsg){
       }
 
       // 총알 렌더용 주입 (판정은 서버)
-      if(msg.bullets) bullets=(msg.bullets||[]).map(b=>({
+      if(multiMode && msg.bullets) bullets=(msg.bullets||[]).map(b=>({
         x:b.x,y:b.y,vx:Math.cos(b.angle||0)*2,vy:Math.sin(b.angle||0)*2,
         angle:b.angle||0,dist:0,alive:true,isMob:b.isMob,
         col:b.col||'#f44',len:24,w:4,dmgOverride:0,pierce:false,range:9999,
