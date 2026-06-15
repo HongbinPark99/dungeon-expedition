@@ -11,11 +11,11 @@ function loop(t=0){
   accumT+=dt;
   let steps=0;
   while(accumT>=FIXED_DT && steps<3){
-    try{ update(); }catch(e){ console.warn('[update]',e); }
+    try{ update(); }catch(e){ console.error('[update ERR]',e); }
     accumT-=FIXED_DT;
     steps++;
   }
-  try{ draw(); }catch(e){ console.warn('[draw]',e); }
+  try{ draw(); }catch(e){ console.error('[draw ERR]',e); }
   if(multiMode){ try{ multiDrawPlayers(); }catch(e){} }
 }
 
