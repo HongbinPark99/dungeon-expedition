@@ -764,7 +764,7 @@ function update(){
   if(bullets.length>80)bullets.splice(0,bullets.length-80);
   let bi=0;
   for(let i=0;i<bullets.length;i++){if(bullets[i].alive)bullets[bi++]=bullets[i];}
-  bullets.length=bi;
+  bullets.length=bi; } // end if(!multiMode) 폭탄/총알
 
   // ── 파티클 ───────────────────────────────────────
   let pi=0;
@@ -895,7 +895,6 @@ function update(){
 
 
 // ── Fog ─────────────────────────────────────────────
-}
 function updateFog(){
   if(!player.alive) return;
   const r=Math.ceil(SIGHT_R/TILE)+1;
