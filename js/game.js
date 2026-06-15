@@ -895,6 +895,7 @@ function update(){
 
 
 // ── Fog ─────────────────────────────────────────────
+}
 function updateFog(){
   if(!player.alive) return;
   const r=Math.ceil(SIGHT_R/TILE)+1;
