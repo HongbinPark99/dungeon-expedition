@@ -689,7 +689,7 @@ function update(){
     });
     items=items.filter(it=>it.life>0);
   }
-  if(player.speedBoost>0) player.speedBoost--;
+  if(player && player.speedBoost>0) player.speedBoost--;
 
   // ── 폭탄/총알 (싱글만 - 멀티는 서버처리) ────────
   if(!multiMode){ bombs.forEach(b=>{
