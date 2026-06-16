@@ -428,7 +428,7 @@ function spawnParticles(x,y,col,n=6){
 // ═══════════════════════════════════════════════════════
 function update(){
   if(!gameRunning && !multiMode) return;
-  if(multiMode && !player) return;
+  if(!player) return;
   tick++;
 
   // ── 플레이어 이동 ─────────────────────────────────
